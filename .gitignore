@@ -1,5 +1,7 @@
 .DS_Store
 Thumbs.db
+old/
+plans/
 
 # Local editor settings
 .idea/
@@ -44,3 +46,6 @@ __pycache__/
 mcp-servers/jaxa/
 mcp-servers/geospatial/
 mcp-servers/dpf/
+
+AGENTS.md
+CLAUDE.md
