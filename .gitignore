@@ -1,0 +1,46 @@
+.DS_Store
+Thumbs.db
+
+# Local editor settings
+.idea/
+.vscode/
+
+# Local tool settings
+.claude/settings.local.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node.js / pnpm
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+.test-dist/
+.next/
+out/
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# MCP servers (cloned externally)
+mcp-servers/jaxa/
+mcp-servers/geospatial/
+mcp-servers/dpf/
