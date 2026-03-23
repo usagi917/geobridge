@@ -17,6 +17,7 @@ import { ErrorSection } from "./error-section";
 import { ChartSection } from "./charts/chart-section";
 import { LocationMap } from "./maps/location-map";
 import { SatelliteOverlayMap } from "./maps/satellite-overlay-map";
+import { GraphVisualizations } from "./graph-visualizations";
 
 interface ReportViewProps {
   report: Report;
@@ -55,6 +56,7 @@ export function ReportView({ report }: ReportViewProps) {
   const timeseries = summaryData?.timeseries as ChartSectionTimeseries | undefined;
   const annualPrecipitation = summaryData?.annual_precipitation as AnnualPrecipitationSeries | undefined;
   const generatedCharts = summaryData?.generated_charts as GeneratedChartEntry[] | undefined;
+  const generatedGraphs = summaryData?.generated_graphs as GeneratedGraphEntry[] | undefined;
   const landPriceHistoryRaw = sanitizeLandPriceHistoryData(
     summaryData?.land_price_history as LandPriceHistoryPoint[] | undefined
   );
@@ -162,6 +164,11 @@ export function ReportView({ report }: ReportViewProps) {
         </section>
       )}
 
+      {/* Urban graph analysis */}
+      {generatedGraphs && generatedGraphs.length > 0 && (
+        <GraphVisualizations graphs={generatedGraphs} />
+      )}
+
       {/* Report sections */}
       {sectionConfig.map(({ key, title }) => (
         <ReportSection
@@ -230,6 +237,13 @@ interface AnnualPrecipitationSeries {
   label: string;
   unit: string;
   data: Array<{ year: number; total: number }>;
+}
+
+interface GeneratedGraphEntry {
+  id: string;
+  title: string;
+  description?: string;
+  imageDataUrl: string;
 }
 
 interface GeneratedChartEntry {

@@ -6,6 +6,8 @@ import type { NormalizedData } from "../normalizer";
 import type { LLMReportOutput } from "../llm/report-generator";
 import type { GeneratedChart, GeneratedMap } from "../visualize/client";
 import { generateLineChartImages, generateMapImages } from "../visualize/client";
+import type { GeneratedGraph } from "./schema";
+import { generateGraphImages } from "../visualize/graph-client";
 
 interface AnnualPrecipitationPoint {
   year: number;
@@ -26,35 +28,44 @@ export async function buildReport(
   generationTimeMs: number,
   model: string
 ): Promise<Report> {
-  // Generate annotated map images from JAXA visualizations
-  let generatedMaps: GeneratedMap[] = [];
-  let generatedCharts: GeneratedChart[] = [];
+  // Generate all visualizations in parallel
   const visualizations = normalizedData.jaxa?.visualizations;
   const annualPrecipitation = buildAnnualPrecipitationSeries(
     normalizedData.jaxa?.timeseries?.precipitation?.data
   );
 
-  if (visualizations && visualizations.length > 0) {
-    generatedMaps = await generateMapImages(
-      visualizations,
-      [input.longitude, input.latitude]
-    );
-  }
+  const mapPromise =
+    visualizations && visualizations.length > 0
+      ? generateMapImages(visualizations, [input.longitude, input.latitude])
+      : Promise.resolve([] as GeneratedMap[]);
 
-  if (annualPrecipitation && annualPrecipitation.data.length > 0) {
-    generatedCharts = await generateLineChartImages([
-      {
-        id: "annual-precipitation",
-        title: "年間降水量推移",
-        description: "月次降水量を年単位に合計した推移です。12か月揃った年のみ表示しています。",
-        unit: annualPrecipitation.unit,
-        points: annualPrecipitation.data.map((point) => ({
-          label: String(point.year),
-          value: point.total,
-        })),
-      },
-    ]);
-  }
+  const chartPromise =
+    annualPrecipitation && annualPrecipitation.data.length > 0
+      ? generateLineChartImages([
+          {
+            id: "annual-precipitation",
+            title: "年間降水量推移",
+            description: "月次降水量を年単位に合計した推移です。12か月揃った年のみ表示しています。",
+            unit: annualPrecipitation.unit,
+            points: annualPrecipitation.data.map((point) => ({
+              label: String(point.year),
+              value: point.total,
+            })),
+          },
+        ])
+      : Promise.resolve([] as GeneratedChart[]);
+
+  const graphPromise = generateGraphImages({
+    latitude: input.latitude,
+    longitude: input.longitude,
+    radius_m: input.radius_m,
+  });
+
+  const [generatedMaps, generatedCharts, generatedGraphs] = await Promise.all([
+    mapPromise,
+    chartPromise,
+    graphPromise,
+  ]);
 
   return {
     id: uuidv4(),
@@ -65,6 +76,7 @@ export async function buildReport(
         normalizedData,
         generatedMaps,
         generatedCharts,
+        generatedGraphs,
         annualPrecipitation
       ),
       disaster_safety: llmOutput.disaster_safety,
@@ -86,6 +98,7 @@ function mergeSectionWithData(
   data: NormalizedData,
   generatedMaps: GeneratedMap[],
   generatedCharts: GeneratedChart[],
+  generatedGraphs: GeneratedGraph[],
   annualPrecipitation?: AnnualPrecipitationSeries
 ): SectionContent {
   const landPricePoints = sanitizeLandPricePoints(data.geospatial?.land_price?.points);
@@ -103,6 +116,7 @@ function mergeSectionWithData(
       visualizations: data.jaxa?.visualizations ?? [],
       generated_maps: generatedMaps,
       generated_charts: generatedCharts,
+      generated_graphs: generatedGraphs,
       timeseries: data.jaxa?.timeseries,
       annual_precipitation: annualPrecipitation,
       land_price_history: landPriceHistory.length > 0 ? landPriceHistory : undefined,

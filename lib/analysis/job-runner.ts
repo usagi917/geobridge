@@ -123,7 +123,7 @@ async function executeAnalysisJob(jobId: string): Promise<void> {
       job.input.perspective
     );
 
-    appendAnalysisJobProgress(jobId, "レポート組立中...");
+    appendAnalysisJobProgress(jobId, "レポート組立中（都市グラフ・衛星画像を並列生成）...");
     const report = await buildReport(
       job.input,
       normalizedData,
