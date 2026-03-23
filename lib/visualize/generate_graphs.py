@@ -545,8 +545,17 @@ def generate_road_centrality_graph(
         for _, row in edges_gdf.iterrows():
             u, v = row.get("u"), row.get("v")
             key = row.get("key", 0)
-            # Try both directions
-            c = edge_centrality.get((u, v), edge_centrality.get((v, u), 0.0))
+            # Try both directions (multigraph keys include edge key)
+            c = edge_centrality.get(
+                (u, v, key),
+                edge_centrality.get(
+                    (v, u, key),
+                    edge_centrality.get(
+                        (u, v),
+                        edge_centrality.get((v, u), 0.0),
+                    ),
+                ),
+            )
             centrality_values.append(c)
 
         edges_gdf["centrality"] = centrality_values
