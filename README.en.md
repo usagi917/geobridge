@@ -39,7 +39,7 @@ If some external data sources fail, the UI still renders partial results togethe
 | Maps | React Leaflet + Leaflet + OpenStreetMap |
 | Storage | SQLite (`terrascore.db`) |
 | MCP Client | `@modelcontextprotocol/sdk` + STDIO transport |
-| LLM | Ollama (default `qwen3.5:35b-a3b`) / OpenAI `gpt-4o` fallback |
+| LLM | Ollama (default `qwen3.5:35b-a3b`) / OpenAI `gpt-5-nano` fallback |
 | Python utilities | `uv` + matplotlib / numpy / Pillow |
 
 ## Repository Layout
@@ -88,6 +88,7 @@ At minimum, configure the following in `.env.local`.
 | `MLIT_DPF_API_KEY` | Yes | MLIT DPF MCP |
 | `OLLAMA_BASE_URL` | No | Ollama endpoint, default `http://localhost:11434` |
 | `OLLAMA_MODEL` | No | Default `qwen3.5:35b-a3b` |
+| `OPENAI_MODEL` | No | Default `gpt-5-nano` |
 | `OPENAI_API_KEY` | No | Fallback when Ollama fails |
 
 Notes:

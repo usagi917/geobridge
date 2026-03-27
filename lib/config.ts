@@ -15,7 +15,7 @@ export const CONFIG = {
     maxTokens: getEnvNumber(process.env.OLLAMA_MAX_TOKENS, 1536),
   },
   openai: {
-    model: process.env.OPENAI_MODEL || "gpt-4o",
+    model: process.env.OPENAI_MODEL || "gpt-5-nano",
     timeout: getEnvNumber(process.env.OPENAI_TIMEOUT_MS, 60_000),
     maxTokens: getEnvNumber(process.env.OPENAI_MAX_TOKENS, 1536),
   },

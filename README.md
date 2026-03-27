@@ -39,7 +39,7 @@ TerraScore は、住所または緯度経度から分析ジョブを作成し、
 | Maps | React Leaflet + Leaflet + OpenStreetMap |
 | Storage | SQLite (`terrascore.db`) |
 | MCP Client | `@modelcontextprotocol/sdk` + STDIO transport |
-| LLM | Ollama (`qwen3.5:35b-a3b` 既定) / OpenAI `gpt-4o` フォールバック |
+| LLM | Ollama (`qwen3.5:35b-a3b` 既定) / OpenAI `gpt-5-nano` フォールバック |
 | Python utilities | `uv` + matplotlib / numpy / Pillow |
 
 ## リポジトリ構成
@@ -88,6 +88,7 @@ pnpm dev
 | `MLIT_DPF_API_KEY` | Yes | MLIT DPF MCP 用 |
 | `OLLAMA_BASE_URL` | No | Ollama 接続先。既定は `http://localhost:11434` |
 | `OLLAMA_MODEL` | No | 既定は `qwen3.5:35b-a3b` |
+| `OPENAI_MODEL` | No | 既定は `gpt-5-nano` |
 | `OPENAI_API_KEY` | No | Ollama 失敗時のフォールバック |
 
 補足:
