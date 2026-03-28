@@ -2,19 +2,21 @@
 
 import Link from "next/link";
 import { coerceNumericValue } from "@/lib/coerce-number";
-import type { Report, SectionContent } from "@/lib/report/schema";
-import {
-  hasSectionContent,
-  parseStructuredReportOutput,
-  type StructuredReportOutput,
-} from "@/lib/report/llm-output";
-import { pickWorseStatus } from "@/lib/report/citations";
+import type { Report } from "@/lib/report/schema";
+import { aggregateSources } from "@/lib/report/citations";
+import { recoverSectionsForDisplay } from "@/lib/report/display-recovery";
 import { sanitizeLandPriceHistory as sanitizeLandPriceHistoryData } from "@/lib/report/sanitize";
-import { uniqueStrings } from "@/lib/utils/strings";
+import { formatPrecipitation } from "@/lib/utils/format";
 import { ReportSection } from "./report-section";
 import { SourceBadge } from "./source-badge";
 import { ErrorSection } from "./error-section";
-import { ChartSection } from "./charts/chart-section";
+import {
+  ChartSection,
+  type TimeseriesEntry,
+  type LandPricePoint,
+  type AnnualPrecipitationEntry,
+  type GeneratedChartEntry,
+} from "./charts/chart-section";
 import { LocationMap } from "./maps/location-map";
 import { SatelliteOverlayMap } from "./maps/satellite-overlay-map";
 
@@ -53,10 +55,10 @@ export function ReportView({ report }: ReportViewProps) {
   });
 
   const timeseries = summaryData?.timeseries as ChartSectionTimeseries | undefined;
-  const annualPrecipitation = summaryData?.annual_precipitation as AnnualPrecipitationSeries | undefined;
+  const annualPrecipitation = summaryData?.annual_precipitation as AnnualPrecipitationEntry | undefined;
   const generatedCharts = summaryData?.generated_charts as GeneratedChartEntry[] | undefined;
   const landPriceHistoryRaw = sanitizeLandPriceHistoryData(
-    summaryData?.land_price_history as LandPriceHistoryPoint[] | undefined
+    summaryData?.land_price_history as LandPricePoint[] | undefined
   );
   const landPriceHistory = landPriceHistoryRaw.length > 0 ? landPriceHistoryRaw : undefined;
   const precipitationCapturedRange = visualizations.find((visualization) => visualization.id === "precipitation")?.capturedRange;
@@ -212,171 +214,13 @@ function formatCapturedMonth([start, end]: [string, string]) {
 }
 
 function formatPrecipitationMetric(value: number): string {
-  const fractionDigits = Math.abs(value) < 0.1 ? 3 : 1;
-  return `${value.toLocaleString("ja-JP", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  })}mm`;
+  return `${formatPrecipitation(value)}mm`;
 }
 
-// Types for chart data passed through Zod schema
-interface ChartSectionTimeseries {
-  ndvi?: { label: string; unit: string; data: Array<{ date: string; mean: number; min?: number; max?: number }> };
-  lst?: { label: string; unit: string; data: Array<{ date: string; mean: number; min?: number; max?: number }> };
-  precipitation?: { label: string; unit: string; data: Array<{ date: string; mean: number; min?: number; max?: number }> };
-}
+// Types re-exported from chart-section for local use
+type ChartSectionTimeseries = {
+  ndvi?: TimeseriesEntry;
+  lst?: TimeseriesEntry;
+  precipitation?: TimeseriesEntry;
+};
 
-interface AnnualPrecipitationSeries {
-  label: string;
-  unit: string;
-  data: Array<{ year: number; total: number }>;
-}
-
-interface GeneratedChartEntry {
-  id: string;
-  title: string;
-  description?: string;
-  imageDataUrl: string;
-}
-
-interface LandPriceHistoryPoint {
-  year: number;
-  price: number;
-  address?: string;
-}
-
-function aggregateSources(sources: Report["sources"]): Report["sources"] {
-  const aggregated = new Map<string, Report["sources"][number]>();
-
-  for (const source of sources) {
-    const key = `${source.name}\u0000${source.url ?? ""}`;
-    const existing = aggregated.get(key);
-
-    if (!existing) {
-      aggregated.set(key, { ...source });
-      continue;
-    }
-
-    existing.status = pickWorseStatus(existing.status, source.status);
-    existing.count = (existing.count ?? 1) + (source.count ?? 1);
-    if (source.fetched_at > existing.fetched_at) {
-      existing.fetched_at = source.fetched_at;
-    }
-  }
-
-  return Array.from(aggregated.values());
-}
-
-
-function recoverSectionsForDisplay(
-  report: Report
-): Report["sections"] {
-  const sections = report.sections;
-  const rawDump = sections.summary.facts.find(looksLikeStructuredDump);
-  if (!rawDump) return sections;
-
-  const recovered = parseStructuredReportOutput(rawDump).output;
-  if (!recovered) {
-    return {
-      ...sections,
-      summary: buildLegacySummaryFallback(sections.summary),
-      data_gaps: {
-        ...sections.data_gaps,
-        gaps: uniqueStrings([
-          "保存済みレポート内の生JSONを省略しました。再生成すると改善します。",
-          ...sections.data_gaps.gaps,
-        ]),
-      },
-    };
-  }
-
-  return {
-    summary: pickDisplaySection(stripStructuredDump(sections.summary), recovered.summary),
-    disaster_safety: pickDisplaySection(sections.disaster_safety, recovered.disaster_safety),
-    livability: pickDisplaySection(sections.livability, recovered.livability),
-    environment: pickDisplaySection(sections.environment, recovered.environment),
-    regional_context: pickDisplaySection(sections.regional_context, recovered.regional_context),
-    data_gaps: mergeDisplayDataGaps(sections.data_gaps, recovered),
-  };
-}
-
-function looksLikeStructuredDump(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.startsWith("{") && trimmed.includes("\"summary\"") && trimmed.includes("\"facts\"");
-}
-
-function stripStructuredDump(section: SectionContent): SectionContent {
-  return {
-    ...section,
-    facts: section.facts.filter((fact) => !looksLikeStructuredDump(fact)),
-  };
-}
-
-function buildLegacySummaryFallback(
-  summary: Report["sections"]["summary"]
-): Report["sections"]["summary"] {
-  const cleaned = stripStructuredDump(summary);
-  if (hasSectionContent(cleaned)) {
-    return cleaned;
-  }
-
-  const facts: string[] = [];
-  const data = summary.data;
-  const elevationMean = coerceNumericValue(data?.elevation?.mean);
-  const landPrice = data?.land_price?.points?.find((point) => {
-    const price = coerceNumericValue(point?.price);
-    return price !== undefined && price > 0;
-  });
-  const lstMean = coerceNumericValue(data?.lst?.mean);
-  const ndviMean = coerceNumericValue(data?.ndvi?.mean);
-  const precipitationMean = coerceNumericValue(data?.precipitation?.mean);
-
-  if (elevationMean !== undefined) {
-    facts.push(`平均標高は ${elevationMean.toFixed(1)}m です。`);
-  }
-  if (landPrice?.price !== undefined) {
-    facts.push(`代表的な地価データは ${landPrice.price.toLocaleString("ja-JP")}円/m² です。`);
-  }
-  if (lstMean !== undefined) {
-    facts.push(`地表面温度の平均は ${lstMean.toFixed(1)}°C です。`);
-  }
-  if (ndviMean !== undefined) {
-    facts.push(`NDVI の平均は ${ndviMean.toFixed(3)} です。`);
-  }
-  if (precipitationMean !== undefined) {
-    facts.push(`対象月の降水量は ${formatPrecipitationMetric(precipitationMean)} です。`);
-  }
-
-  return {
-    ...cleaned,
-    facts: facts.length > 0
-      ? facts
-      : ["構造化された要約を復元できなかったため、主要指標のみ表示しています。"],
-    gaps: uniqueStrings([
-      "保存済みレポートの要約テキストを復元できなかったため、主要指標から簡易表示しています。",
-      ...cleaned.gaps,
-    ]),
-  };
-}
-
-function pickDisplaySection(
-  current: SectionContent,
-  recovered: StructuredReportOutput[keyof StructuredReportOutput]
-): SectionContent {
-  return hasSectionContent(current) ? current : recovered;
-}
-
-function mergeDisplayDataGaps(
-  current: SectionContent,
-  recovered: StructuredReportOutput
-): SectionContent {
-  return {
-    facts: uniqueStrings([...current.facts, ...recovered.data_gaps.facts]),
-    gaps: uniqueStrings([
-      "保存済みレポート内の生JSONを自動復元して表示しています。",
-      ...current.gaps,
-      ...recovered.data_gaps.gaps,
-    ]),
-    risks: uniqueStrings([...current.risks, ...recovered.data_gaps.risks]),
-  };
-}

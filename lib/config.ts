@@ -1,10 +1,23 @@
 const perspectives = ["comprehensive", "child_rearing", "disaster", "livability"] as const;
+const openaiReasoningEfforts = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
+const openaiVerbosityLevels = ["low", "medium", "high"] as const;
 
 export type Perspective = (typeof perspectives)[number];
+export type OpenAIReasoningEffort = (typeof openaiReasoningEfforts)[number];
+export type OpenAIVerbosity = (typeof openaiVerbosityLevels)[number];
 
 function getEnvNumber(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getEnvEnum<T extends readonly string[]>(
+  value: string | undefined,
+  allowed: T,
+  fallback: T[number]
+): T[number] {
+  if (!value) return fallback;
+  return allowed.includes(value as T[number]) ? (value as T[number]) : fallback;
 }
 
 export const CONFIG = {
@@ -15,9 +28,12 @@ export const CONFIG = {
     maxTokens: getEnvNumber(process.env.OLLAMA_MAX_TOKENS, 1536),
   },
   openai: {
+    baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
     model: process.env.OPENAI_MODEL || "gpt-5-nano",
     timeout: getEnvNumber(process.env.OPENAI_TIMEOUT_MS, 60_000),
     maxTokens: getEnvNumber(process.env.OPENAI_MAX_TOKENS, 1536),
+    reasoningEffort: getEnvEnum(process.env.OPENAI_REASONING_EFFORT, openaiReasoningEfforts, "low"),
+    verbosity: getEnvEnum(process.env.OPENAI_VERBOSITY, openaiVerbosityLevels, "low"),
   },
   mcp: {
     jaxa: {

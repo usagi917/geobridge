@@ -20,9 +20,14 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult> {
     throw new Error(`住所が見つかりませんでした: ${address}`);
   }
 
-  const [lon, lat] = data[0].geometry.coordinates;
+  const coords = data[0]?.geometry?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2) {
+    throw new Error(`ジオコーディング結果に座標が含まれていません: ${address}`);
+  }
+
+  const [lon, lat] = coords;
   return {
-    address: data[0].properties.title || address,
+    address: data[0].properties?.title || address,
     latitude: lat,
     longitude: lon,
   };

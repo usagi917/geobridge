@@ -1,6 +1,7 @@
 import {
   appendAnalysisJobProgress,
   getAnalysisJob,
+  getPendingAnalysisJobIds,
   markAnalysisJobCompleted,
   markAnalysisJobFailed,
   markAnalysisJobQueued,
@@ -32,9 +33,29 @@ function getQueueState(): QueueState {
       pending: [],
       processing: false,
     };
+    recoverPendingJobs(globalThis.__terrascoreAnalysisQueue);
   }
 
   return globalThis.__terrascoreAnalysisQueue;
+}
+
+function recoverPendingJobs(state: QueueState): void {
+  try {
+    const ids = getPendingAnalysisJobIds();
+    let recovered = false;
+    for (const id of ids) {
+      if (!state.activeJobs.has(id) && !state.queuedJobs.has(id)) {
+        state.pending.push(id);
+        state.queuedJobs.add(id);
+        recovered = true;
+      }
+    }
+    if (recovered) {
+      void pumpAnalysisQueue();
+    }
+  } catch {
+    // DB may not be initialized yet during early import — silently skip.
+  }
 }
 
 export function isAnalysisJobActive(jobId: string): boolean {
@@ -43,12 +64,10 @@ export function isAnalysisJobActive(jobId: string): boolean {
 
 export function enqueueAnalysisJob(jobId: string): void {
   const state = getQueueState();
-  if (state.activeJobs.has(jobId) || state.queuedJobs.has(jobId)) {
-    return;
+  if (!state.activeJobs.has(jobId) && !state.queuedJobs.has(jobId)) {
+    state.pending.push(jobId);
+    state.queuedJobs.add(jobId);
   }
-
-  state.pending.push(jobId);
-  state.queuedJobs.add(jobId);
   void pumpAnalysisQueue();
 }
 

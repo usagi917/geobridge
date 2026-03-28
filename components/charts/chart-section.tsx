@@ -4,25 +4,25 @@ import Image from "next/image";
 import { TrendChart } from "./trend-chart";
 import { LandPriceChart } from "./land-price-chart";
 
-interface TimeseriesEntry {
+export interface TimeseriesEntry {
   label: string;
   unit: string;
   data: Array<{ date: string; mean: number; min?: number; max?: number }>;
 }
 
-interface LandPricePoint {
+export interface LandPricePoint {
   year: number;
   price: number;
   address?: string;
 }
 
-interface AnnualPrecipitationEntry {
+export interface AnnualPrecipitationEntry {
   label: string;
   unit: string;
   data: Array<{ year: number; total: number }>;
 }
 
-interface GeneratedChartEntry {
+export interface GeneratedChartEntry {
   id: string;
   title: string;
   description?: string;

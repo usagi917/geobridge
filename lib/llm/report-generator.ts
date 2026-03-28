@@ -3,6 +3,7 @@ import { isOpenAIAvailable, generateWithOpenAI } from "./openai";
 import { getSystemPrompt, buildUserPrompt } from "./prompts";
 import type { NormalizedData } from "../normalizer";
 import type { Perspective } from "../config";
+import { formatPrecipitation } from "../utils/format";
 import {
   createEmptySection,
   hasSectionContent,
@@ -44,7 +45,8 @@ export async function generateReport(
       try {
         console.info("[report-generator] Falling back to OpenAI");
         const response = await generateWithOpenAI(userPrompt, systemPrompt, {
-          temperature: 0.3,
+          reasoningEffort: "low",
+          verbosity: "low",
         });
         return parseLLMResponse(response, normalizedData, address);
       } catch (openaiError) {
@@ -344,9 +346,5 @@ function formatNumber(value: number, maximumFractionDigits: number = 1): string 
 }
 
 function formatPrecipitationValue(value: number): string {
-  const fractionDigits = Math.abs(value) < 0.1 ? 3 : 1;
-  return value.toLocaleString("ja-JP", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
+  return formatPrecipitation(value);
 }

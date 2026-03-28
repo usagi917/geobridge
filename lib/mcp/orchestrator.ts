@@ -5,6 +5,7 @@ import { withTimeout } from "./utils";
 import { CONFIG, type Perspective } from "../config";
 import type { GeospatialCallResult, OrchestratorResult } from "./types";
 import { CitationTracker } from "../report/citations";
+import { allSettledWithConcurrency } from "../utils/concurrency";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,41 +31,6 @@ async function withRetry<T>(
       console.warn(`[orchestrator] retrying ${label} (${attempt}/${retries})`);
     }
   }
-}
-
-async function allSettledWithConcurrency<T>(
-  tasks: Array<() => Promise<T>>,
-  concurrency: number
-): Promise<Array<PromiseSettledResult<T>>> {
-  if (tasks.length === 0) return [];
-
-  const results: Array<PromiseSettledResult<T>> = new Array(tasks.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIndex < tasks.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-
-      try {
-        results[currentIndex] = {
-          status: "fulfilled",
-          value: await tasks[currentIndex](),
-        };
-      } catch (error) {
-        results[currentIndex] = {
-          status: "rejected",
-          reason: error,
-        };
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker())
-  );
-
-  return results;
 }
 
 export type ProgressCallback = (step: string) => void;

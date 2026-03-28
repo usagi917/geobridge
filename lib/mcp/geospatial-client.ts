@@ -1,7 +1,8 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CONFIG } from "../config";
 import { extractLandPriceValue } from "../land-price";
+import { mapWithConcurrency } from "../utils/concurrency";
+import { pickString } from "../utils/strings";
+import { McpClientManager } from "./client-manager";
 import {
   getTextFromToolResult,
   type GeospatialCallResult,
@@ -10,10 +11,6 @@ import {
   type McpToolResult,
 } from "./types";
 import { withTimeout } from "./utils";
-
-let geospatialClient: Client | null = null;
-let geospatialTransport: StdioClientTransport | null = null;
-let geospatialClientPromise: Promise<Client> | null = null;
 
 interface GeospatialEnvelope {
   status?: unknown;
@@ -31,44 +28,20 @@ interface GeospatialApiResultEnvelope {
   error?: unknown;
 }
 
-async function getClient(): Promise<Client> {
-  if (geospatialClient) return geospatialClient;
-  if (geospatialClientPromise) return geospatialClientPromise;
+const manager = new McpClientManager({
+  name: "terrascore-geospatial",
+  command: CONFIG.mcp.geospatial.command,
+  args: CONFIG.mcp.geospatial.args,
+  env: {
+    ...Object.fromEntries(
+      Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
+    ),
+    LIBRARY_API_KEY: process.env.MLIT_GEOSPATIAL_API_KEY || "",
+  },
+});
 
-  geospatialClientPromise = (async () => {
-    const transport = new StdioClientTransport({
-      command: CONFIG.mcp.geospatial.command,
-      args: CONFIG.mcp.geospatial.args,
-      env: {
-        ...process.env,
-        LIBRARY_API_KEY: process.env.MLIT_GEOSPATIAL_API_KEY || "",
-      },
-    });
-
-    const client = new Client({ name: "terrascore-geospatial", version: "1.0.0" }, { capabilities: {} });
-    await client.connect(transport);
-    geospatialTransport = transport;
-    geospatialClient = client;
-    return client;
-  })();
-
-  try {
-    return await geospatialClientPromise;
-  } catch (error) {
-    geospatialClient = null;
-    geospatialTransport = null;
-    throw error;
-  } finally {
-    if (geospatialClient) {
-      geospatialClientPromise = null;
-    }
-  }
-}
-
-async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  const client = await getClient();
-  const result = await client.callTool({ name, arguments: args });
-  return result as McpToolResult;
+function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
+  return manager.callTool(name, args);
 }
 
 function getTextContent(result: McpToolResult): string {
@@ -136,29 +109,6 @@ function toToolError(tool: string, message: string): GeospatialToolError {
   return { tool, message };
 }
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  mapper: (item: T) => Promise<R>
-): Promise<R[]> {
-  if (items.length === 0) return [];
-
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (true) {
-      const currentIndex = nextIndex++;
-      if (currentIndex >= items.length) return;
-      results[currentIndex] = await mapper(items[currentIndex]);
-    }
-  }
-
-  const workerCount = Math.max(1, Math.min(limit, items.length));
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}
-
 export async function getMultiApi(
   lat: number,
   lon: number,
@@ -196,18 +146,6 @@ export async function getMultiApi(
     data: Object.keys(mappedResults).length > 0 ? mappedResults : null,
     errors,
   };
-}
-
-export async function getLandPrice(lat: number, lon: number): Promise<unknown> {
-  const result = await getMultiApi(lat, lon, [3]);
-  if (!result.data || typeof result.data !== "object") return null;
-  return result.data["3"] ?? null;
-}
-
-export async function getUrbanPlanning(lat: number, lon: number): Promise<unknown> {
-  const result = await getMultiApi(lat, lon, [4]);
-  if (!result.data || typeof result.data !== "object") return null;
-  return result.data["4"] ?? null;
 }
 
 export async function getLandPriceHistory(
@@ -295,20 +233,5 @@ export async function getLandPriceHistory(
 }
 
 export async function closeClient(): Promise<void> {
-  if (geospatialTransport) {
-    await geospatialTransport.close();
-    geospatialClient = null;
-    geospatialTransport = null;
-    geospatialClientPromise = null;
-  }
-}
-
-function pickString(props: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = props[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return undefined;
+  await manager.close();
 }

@@ -1,11 +1,10 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { CONFIG } from "../config";
 import { buildMonthlyTimeseriesPoints, type RawSpatialStatsSeries } from "../monthly-timeseries";
 import {
   convertMonthlyRateStatsToAccumulation,
   convertMonthlyRateTimeseriesToAccumulation,
 } from "../precipitation";
+import { McpClientManager } from "./client-manager";
 import {
   createBbox,
   getTextFromToolResult,
@@ -17,10 +16,6 @@ import {
   type McpToolResult,
 } from "./types";
 
-let jaxaClient: Client | null = null;
-let jaxaTransport: StdioClientTransport | null = null;
-let jaxaClientPromise: Promise<Client> | null = null;
-
 function getJaxaProcessEnv(): Record<string, string> {
   const env = Object.fromEntries(
     Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined)
@@ -31,41 +26,15 @@ function getJaxaProcessEnv(): Record<string, string> {
   return env;
 }
 
-async function getClient(): Promise<Client> {
-  if (jaxaClient) return jaxaClient;
-  if (jaxaClientPromise) return jaxaClientPromise;
+const manager = new McpClientManager({
+  name: "terrascore-jaxa",
+  command: CONFIG.mcp.jaxa.command,
+  args: CONFIG.mcp.jaxa.args,
+  env: getJaxaProcessEnv(),
+});
 
-  jaxaClientPromise = (async () => {
-    const transport = new StdioClientTransport({
-      command: CONFIG.mcp.jaxa.command,
-      args: CONFIG.mcp.jaxa.args,
-      env: getJaxaProcessEnv(),
-    });
-
-    const client = new Client({ name: "terrascore-jaxa", version: "1.0.0" }, { capabilities: {} });
-    await client.connect(transport);
-    jaxaTransport = transport;
-    jaxaClient = client;
-    return client;
-  })();
-
-  try {
-    return await jaxaClientPromise;
-  } catch (error) {
-    jaxaClient = null;
-    jaxaTransport = null;
-    throw error;
-  } finally {
-    if (jaxaClient) {
-      jaxaClientPromise = null;
-    }
-  }
-}
-
-async function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  const client = await getClient();
-  const result = await client.callTool({ name, arguments: args });
-  return result as McpToolResult;
+function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
+  return manager.callTool(name, args);
 }
 
 function toIsoWithoutMillis(date: Date): string {
@@ -294,7 +263,6 @@ async function calcSpatialStatsTimeseries(
   lon: number,
   radiusM: number,
   years: number,
-  timeoutMs: number
 ): Promise<JaxaTimeseries | null> {
   const safeEndDate = getSafeMonthlyDataEndDate();
   const endYear = safeEndDate.getUTCFullYear();
@@ -316,29 +284,21 @@ async function calcSpatialStatsTimeseries(
 
   const bbox = createBbox(lat, lon, radiusM);
 
+  // Timeout is handled by the orchestrator's withTimeout wrapper,
+  // so no per-chunk timeout is needed here (avoids timer leaks).
   const results = await Promise.allSettled(
-    yearChunks.map(({ dateRange }) => {
-      const promise = callTool("calc_spatial_stats", {
+    yearChunks.map(async ({ dateRange, year }) => {
+      const result = await callTool("calc_spatial_stats", {
         collection: collectionId,
         band,
         bbox,
         dlim: dateRange,
       });
-      return new Promise<{ raw: RawSpatialStatsSeries; year: number }>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("Timeseries chunk timeout")), timeoutMs);
-        promise.then(
-          (result) => {
-            clearTimeout(timer);
-            if (result.isError) { reject(new Error("Tool error")); return; }
-            const text = getTextFromToolResult(result);
-            if (!text) { reject(new Error("No text")); return; }
-            const parsed = JSON.parse(text) as RawSpatialStatsSeries;
-            const chunkYear = yearChunks.find(c => c.dateRange === dateRange)!.year;
-            resolve({ raw: parsed, year: chunkYear });
-          },
-          (err) => { clearTimeout(timer); reject(err); }
-        );
-      });
+      if (result.isError) throw new Error("Tool error");
+      const text = getTextFromToolResult(result);
+      if (!text) throw new Error("No text");
+      const parsed = JSON.parse(text) as RawSpatialStatsSeries;
+      return { raw: parsed, year };
     })
   );
 
@@ -368,7 +328,7 @@ export async function getTimeseriesNdvi(
   const ts = await calcSpatialStatsTimeseries(
     "JAXA.G-Portal_GCOM-C.SGLI_standard.L3-NDVI.daytime.v3_global_monthly",
     "NDVI",
-    lat, lon, ensureMinimumRadius(radiusM, SGLI_MIN_RADIUS_M), years, 20_000
+    lat, lon, ensureMinimumRadius(radiusM, SGLI_MIN_RADIUS_M), years
   );
   if (ts) ts.unit = "";
   return ts;
@@ -383,7 +343,7 @@ export async function getTimeseriesLst(
   const ts = await calcSpatialStatsTimeseries(
     "JAXA.G-Portal_GCOM-C.SGLI_standard.L3-LST.daytime.v3_global_monthly",
     "LST",
-    lat, lon, ensureMinimumRadius(radiusM, SGLI_MIN_RADIUS_M), years, 20_000
+    lat, lon, ensureMinimumRadius(radiusM, SGLI_MIN_RADIUS_M), years
   );
   if (ts) ts.unit = "K"; // Will be converted to °C in normalizer
   return ts;
@@ -398,16 +358,11 @@ export async function getTimeseriesPrecipitation(
   const ts = await calcSpatialStatsTimeseries(
     "JAXA.EORC_GSMaP_standard.Gauge.00Z-23Z.v6_monthly",
     "PRECIP",
-    lat, lon, gsmapRadiusM, years, 20_000
+    lat, lon, gsmapRadiusM, years
   );
   return convertMonthlyRateTimeseriesToAccumulation(ts);
 }
 
 export async function closeClient(): Promise<void> {
-  if (jaxaTransport) {
-    await jaxaTransport.close();
-    jaxaClient = null;
-    jaxaTransport = null;
-    jaxaClientPromise = null;
-  }
+  await manager.close();
 }

@@ -28,8 +28,6 @@ interface TrendChartProps {
 
 const TERRA_COLORS = {
   primary: "#0d9488",
-  secondary: "#14b8a6",
-  light: "#ccfbf1",
 };
 
 export function TrendChart({ title, data, unit, color = TERRA_COLORS.primary }: TrendChartProps) {

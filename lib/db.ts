@@ -142,23 +142,26 @@ export function getAnalysisJob(id: string): AnalysisJob | null {
 }
 
 export function appendAnalysisJobProgress(id: string, step: string): AnalysisJob | null {
-  const job = getAnalysisJob(id);
-  if (!job) return null;
+  const db = getDb();
+  const updatedAt = new Date().toISOString();
 
-  if (job.progress[job.progress.length - 1] === step) {
-    return job;
+  // Atomic append using SQLite JSON1 — avoids read-modify-write race.
+  // The WHERE clause deduplicates: skip if the last element already equals `step`.
+  const result = db.prepare(`
+    UPDATE analysis_jobs
+    SET progress_json = json_insert(progress_json, '$[#]', ?),
+        updated_at = ?
+    WHERE id = ?
+      AND json_extract(progress_json, '$[' || (json_array_length(progress_json) - 1) || ']') != ?
+  `).run(step, updatedAt, id, step);
+
+  // If no row was updated, it was either a duplicate step or unknown id.
+  // Fall through to getAnalysisJob to return current state either way.
+  if (result.changes === 0) {
+    return getAnalysisJob(id);
   }
 
-  const nextProgress = [...job.progress, step];
-  const updatedAt = new Date().toISOString();
-  const db = getDb();
-  db.prepare(`
-    UPDATE analysis_jobs
-    SET progress_json = ?, updated_at = ?
-    WHERE id = ?
-  `).run(JSON.stringify(nextProgress), updatedAt, id);
-
-  return { ...job, progress: nextProgress, updated_at: updatedAt };
+  return getAnalysisJob(id);
 }
 
 export function markAnalysisJobRunning(id: string): void {
@@ -189,6 +192,14 @@ export function markAnalysisJobCompleted(id: string, reportId: string): void {
     SET status = 'completed', report_id = ?, error_message = NULL, updated_at = ?
     WHERE id = ?
   `).run(reportId, new Date().toISOString(), id);
+}
+
+export function getPendingAnalysisJobIds(): string[] {
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT id FROM analysis_jobs WHERE status IN ('queued', 'running') ORDER BY created_at ASC"
+  ).all() as Array<{ id: string }>;
+  return rows.map((r) => r.id);
 }
 
 export function markAnalysisJobFailed(id: string, errorMessage: string): void {
