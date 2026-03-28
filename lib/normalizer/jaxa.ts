@@ -2,6 +2,9 @@ import type { JaxaLayerImage, JaxaResults, JaxaSpatialStats, JaxaTimeseries } fr
 import { coerceNumericValue } from "../coerce-number";
 import type { NormalizedJaxa, NormalizedTimeseriesEntry, TimeseriesDataPoint } from "./index";
 
+const KELVIN_OFFSET = 273.15;
+const KELVIN_LIKE_THRESHOLD = 150;
+
 export function normalizeJaxa(raw: JaxaResults): NormalizedJaxa {
   const result: NormalizedJaxa = {};
 
@@ -38,9 +41,9 @@ export function normalizeJaxa(raw: JaxaResults): NormalizedJaxa {
     const min = coerceNumericValue(raw.lst.min);
     const max = coerceNumericValue(raw.lst.max);
     result.lst = {
-      mean: mean !== undefined ? mean - 273.15 : undefined, // Kelvin → Celsius
-      min: min !== undefined ? min - 273.15 : undefined,
-      max: max !== undefined ? max - 273.15 : undefined,
+      mean: normalizeLstValue(mean, raw.lst.unit),
+      min: normalizeLstValue(min, raw.lst.unit),
+      max: normalizeLstValue(max, raw.lst.unit),
       unit: "°C",
     };
   }
@@ -54,7 +57,12 @@ export function normalizeJaxa(raw: JaxaResults): NormalizedJaxa {
 
   const visualizations = [
     buildVisualization(raw.images?.ndvi, raw.ndvi, undefined),
-    buildVisualization(raw.images?.lst, raw.lst, "°C", -273.15),
+    buildVisualization(
+      raw.images?.lst,
+      raw.lst,
+      "°C",
+      (value) => normalizeLstValue(value, raw.lst?.unit) ?? value
+    ),
     buildVisualization(raw.images?.precipitation, raw.precipitation, "mm"),
   ].filter((value): value is NonNullable<typeof value> => value !== null);
 
@@ -71,7 +79,12 @@ export function normalizeJaxa(raw: JaxaResults): NormalizedJaxa {
       if (entry) ts.ndvi = entry;
     }
     if (raw.timeseriesData.lst) {
-      const entry = normalizeTimeseries(raw.timeseriesData.lst, "地表面温度", "°C", -273.15);
+      const entry = normalizeTimeseries(
+        raw.timeseriesData.lst,
+        "地表面温度",
+        "°C",
+        (value) => normalizeLstValue(value, raw.timeseriesData?.lst?.unit) ?? value
+      );
       if (entry) ts.lst = entry;
     }
     if (raw.timeseriesData.precipitation) {
@@ -91,17 +104,23 @@ function normalizeTimeseries(
   raw: JaxaTimeseries,
   label: string,
   unit: string,
-  offset: number = 0
+  normalizeValue: (value: number) => number = (value) => value
 ): NormalizedTimeseriesEntry | undefined {
   if (!raw.points || raw.points.length === 0) return undefined;
 
   const data: TimeseriesDataPoint[] = [];
   for (const p of raw.points) {
-    const mean = p.mean + offset;
+    const mean = normalizeValue(p.mean);
     if (!Number.isFinite(mean)) continue;
     const point: TimeseriesDataPoint = { date: p.date, mean };
-    if (p.min !== undefined && Number.isFinite(p.min + offset)) point.min = p.min + offset;
-    if (p.max !== undefined && Number.isFinite(p.max + offset)) point.max = p.max + offset;
+    if (p.min !== undefined) {
+      const min = normalizeValue(p.min);
+      if (Number.isFinite(min)) point.min = min;
+    }
+    if (p.max !== undefined) {
+      const max = normalizeValue(p.max);
+      if (Number.isFinite(max)) point.max = max;
+    }
     data.push(point);
   }
 
@@ -113,7 +132,7 @@ function buildVisualization(
   image: JaxaLayerImage | null | undefined,
   stats: JaxaSpatialStats | null | undefined,
   unitOverride?: string,
-  offset: number = 0
+  normalizeValue: (value: number) => number = (value) => value
 ) {
   if (!image) return null;
 
@@ -123,11 +142,11 @@ function buildVisualization(
 
   return {
     ...image,
-    mean: mean !== undefined ? mean + offset : undefined,
-    min: min !== undefined ? min + offset : undefined,
-    max: max !== undefined ? max + offset : undefined,
+    mean: mean !== undefined ? normalizeValue(mean) : undefined,
+    min: min !== undefined ? normalizeValue(min) : undefined,
+    max: max !== undefined ? normalizeValue(max) : undefined,
     unit: unitOverride ?? stats?.unit,
-    valueLabel: formatValueLabel(image.id, mean, unitOverride ?? stats?.unit, offset),
+    valueLabel: formatValueLabel(image.id, mean, unitOverride ?? stats?.unit, normalizeValue),
   };
 }
 
@@ -135,14 +154,41 @@ function formatValueLabel(
   id: "ndvi" | "lst" | "precipitation",
   value: number | undefined,
   unit?: string,
-  offset: number = 0
+  normalizeValue: (value: number) => number = (value) => value
 ): string | undefined {
   if (value === undefined) return undefined;
 
-  const normalizedValue = value + offset;
+  const normalizedValue = normalizeValue(value);
   if (id === "ndvi") {
     return `平均 ${normalizedValue.toLocaleString("ja-JP", { maximumFractionDigits: 3 })}`;
   }
 
   return `平均 ${normalizedValue.toLocaleString("ja-JP", { maximumFractionDigits: 1 })}${unit ?? ""}`;
+}
+
+function normalizeLstValue(value: number | undefined, unit?: string): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+
+  const normalizedUnit = normalizeTemperatureUnit(unit);
+  if (normalizedUnit === "celsius") return value;
+  if (normalizedUnit === "kelvin") return value - KELVIN_OFFSET;
+
+  // JAXA LST is normally Kelvin. If the upstream wrapper omits the unit,
+  // only convert values that are clearly Kelvin-like to avoid double conversion.
+  return value >= KELVIN_LIKE_THRESHOLD ? value - KELVIN_OFFSET : value;
+}
+
+function normalizeTemperatureUnit(unit?: string): "celsius" | "kelvin" | undefined {
+  const normalized = unit?.trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  if (normalized === "k" || normalized === "kelvin") {
+    return "kelvin";
+  }
+
+  if (normalized === "c" || normalized === "°c" || normalized === "℃" || normalized === "celsius") {
+    return "celsius";
+  }
+
+  return undefined;
 }

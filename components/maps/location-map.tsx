@@ -2,10 +2,13 @@
 
 import dynamic from "next/dynamic";
 
+import type { ProximityFacility } from "../../lib/city2graph/types";
+
 interface LocationMapProps {
   latitude: number;
   longitude: number;
   radiusM: number;
+  proximityFacilities?: ProximityFacility[];
 }
 
 const MapInner = dynamic(() => import("./location-map-inner"), {

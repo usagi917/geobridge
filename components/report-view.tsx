@@ -19,6 +19,10 @@ import {
 } from "./charts/chart-section";
 import { LocationMap } from "./maps/location-map";
 import { SatelliteOverlayMap } from "./maps/satellite-overlay-map";
+import { ProximityCard } from "./proximity-card";
+import { MorphologyCard } from "./morphology-card";
+import { IsochroneMap } from "./maps/isochrone-map";
+import type { ProximityResult, MorphologyResult, IsochroneResult, ProximityFacility } from "@/lib/city2graph/types";
 
 interface ReportViewProps {
   report: Report;
@@ -61,6 +65,15 @@ export function ReportView({ report }: ReportViewProps) {
     summaryData?.land_price_history as LandPricePoint[] | undefined
   );
   const landPriceHistory = landPriceHistoryRaw.length > 0 ? landPriceHistoryRaw : undefined;
+  const proximityData = summaryData?.proximity as ProximityResult | undefined;
+  const morphologyData = summaryData?.morphology as MorphologyResult | undefined;
+  const isochroneData = summaryData?.isochrone as IsochroneResult | undefined;
+
+  // Flatten all proximity facilities for map markers
+  const allFacilities: ProximityFacility[] = proximityData
+    ? Object.values(proximityData.categories).flatMap((cat) => cat.facilities)
+    : [];
+
   const precipitationCapturedRange = visualizations.find((visualization) => visualization.id === "precipitation")?.capturedRange;
   const precipitationCaption = precipitationCapturedRange
     ? `対象月 ${formatCapturedMonth(precipitationCapturedRange)}`
@@ -122,6 +135,12 @@ export function ReportView({ report }: ReportViewProps) {
               value={`${landPricePoint.price.toLocaleString("ja-JP")}円/m²`}
             />
           )}
+          {proximityData && (
+            <MetricCard label="生活利便" value={`${proximityData.score}/100`} />
+          )}
+          {morphologyData && (
+            <MetricCard label="街区成熟度" value={`${morphologyData.maturity_score}/100`} />
+          )}
         </div>
       )}
 
@@ -130,7 +149,20 @@ export function ReportView({ report }: ReportViewProps) {
         latitude={report.input.latitude}
         longitude={report.input.longitude}
         radiusM={report.input.radius_m}
+        proximityFacilities={allFacilities.length > 0 ? allFacilities : undefined}
       />
+
+      {/* city2graph sections */}
+      {proximityData && <ProximityCard data={proximityData} />}
+      {morphologyData && <MorphologyCard data={morphologyData} />}
+      {isochroneData && isochroneData.features.length > 0 && (
+        <IsochroneMap
+          latitude={report.input.latitude}
+          longitude={report.input.longitude}
+          isochrone={isochroneData}
+          facilities={allFacilities.length > 0 ? allFacilities : undefined}
+        />
+      )}
 
       {/* Trend charts */}
       <ChartSection

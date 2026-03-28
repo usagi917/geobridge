@@ -72,7 +72,7 @@ export function aggregateSources(sources: Source[]): Source[] {
   return Array.from(aggregated.values());
 }
 
-export function pickWorseStatus(current: Source["status"], next: Source["status"]): Source["status"] {
+function pickWorseStatus(current: Source["status"], next: Source["status"]): Source["status"] {
   const severity: Record<Source["status"], number> = {
     success: 0,
     partial: 1,

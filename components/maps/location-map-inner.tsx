@@ -1,30 +1,22 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 import { MapContainer, TileLayer, Marker, Circle, Popup } from "react-leaflet";
+import type { ProximityFacility } from "../../lib/city2graph/types";
+import { defaultIcon, getCategoryIcon } from "./map-icons";
 
 interface LocationMapInnerProps {
   latitude: number;
   longitude: number;
   radiusM: number;
+  proximityFacilities?: ProximityFacility[];
 }
-
-// Fix default marker icon issue with webpack/next.js
-const defaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
 
 export default function LocationMapInner({
   latitude,
   longitude,
   radiusM,
+  proximityFacilities,
 }: LocationMapInnerProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -51,6 +43,19 @@ export default function LocationMapInner({
             weight: 2,
           }}
         />
+        {proximityFacilities?.map((fac, i) => (
+          <Marker
+            key={`poi-${fac.category}-${i}`}
+            position={[fac.lat, fac.lon]}
+            icon={getCategoryIcon(fac.category, 10)}
+          >
+            <Popup>
+              <strong>{fac.name}</strong>
+              <br />
+              {Math.round(fac.distance_m)}m
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   );

@@ -1,9 +1,11 @@
 import * as jaxa from "./jaxa-client";
 import * as geospatial from "./geospatial-client";
 import * as dpf from "./dpf-client";
+import * as city2graph from "../city2graph/client";
 import { withTimeout } from "./utils";
 import { CONFIG, type Perspective } from "../config";
 import type { GeospatialCallResult, OrchestratorResult } from "./types";
+import type { City2GraphResults } from "../city2graph/types";
 import { CitationTracker } from "../report/citations";
 import { allSettledWithConcurrency } from "../utils/concurrency";
 
@@ -79,21 +81,41 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   function createJaxaTask<T>(
     promiseFactory: () => Promise<T>,
-    timeoutMs: number,
-    timeoutLabel: string,
+    label: string,
     progressLabel: string
   ): () => Promise<T> {
     return () =>
       tracked(
         withRetry(
-          () => withTimeout(promiseFactory(), timeoutMs, timeoutLabel),
+          promiseFactory,
           jaxaRetryCount,
-          timeoutLabel,
+          label,
           shouldRetryJaxa
         ),
         progressLabel
       );
   }
+
+  // city2graph tasks (run in parallel with everything else)
+  const c2gTimeout = CONFIG.city2graph.timeout;
+  const c2gEnabled = CONFIG.city2graph.enabled;
+  const c2gSkipped: PromiseSettledResult<null> = { status: "fulfilled", value: null };
+  const city2graphPromise = c2gEnabled
+    ? Promise.allSettled([
+        tracked(
+          withTimeout(city2graph.analyzeProximity(latitude, longitude, CONFIG.city2graph.proximityRadiusM), c2gTimeout, "city2graph proximity"),
+          "生活利便ネットワーク"
+        ),
+        tracked(
+          withTimeout(city2graph.analyzeMorphology(latitude, longitude, CONFIG.city2graph.morphologyRadiusM), c2gTimeout, "city2graph morphology"),
+          "街区構造分析"
+        ),
+        tracked(
+          withTimeout(city2graph.analyzeIsochrone(latitude, longitude), c2gTimeout, "city2graph isochrone"),
+          "徒歩圏マップ"
+        ),
+      ])
+    : Promise.resolve([c2gSkipped, c2gSkipped, c2gSkipped] as const);
 
   const nonJaxaResultsPromise = Promise.allSettled([
     tracked(
@@ -117,26 +139,22 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const jaxaStatsTasks = [
     createJaxaTask(
-      () => jaxa.getElevation(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getElevation(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA elevation",
       "JAXA 標高"
     ),
     createJaxaTask(
-      () => jaxa.getNdvi(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getNdvi(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA NDVI",
       "JAXA NDVI"
     ),
     createJaxaTask(
-      () => jaxa.getLst(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getLst(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA LST",
       "JAXA 地表面温度"
     ),
     createJaxaTask(
-      () => jaxa.getPrecipitation(latitude, longitude),
-      jaxaStatsTimeout,
+      () => jaxa.getPrecipitation(latitude, longitude, { timeout: jaxaStatsTimeout }),
       "JAXA precipitation",
       "JAXA 降水量"
     ),
@@ -144,20 +162,17 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const jaxaImageTasks = [
     createJaxaTask(
-      () => jaxa.getNdviImage(latitude, longitude, radiusM),
-      jaxaImageTimeout,
+      () => jaxa.getNdviImage(latitude, longitude, radiusM, { timeout: jaxaImageTimeout }),
       "JAXA NDVI image",
       "JAXA NDVI 可視化"
     ),
     createJaxaTask(
-      () => jaxa.getLstImage(latitude, longitude, radiusM),
-      jaxaImageTimeout,
+      () => jaxa.getLstImage(latitude, longitude, radiusM, { timeout: jaxaImageTimeout }),
       "JAXA LST image",
       "JAXA 温度可視化"
     ),
     createJaxaTask(
-      () => jaxa.getPrecipitationImage(latitude, longitude),
-      jaxaImageTimeout,
+      () => jaxa.getPrecipitationImage(latitude, longitude, { timeout: jaxaImageTimeout }),
       "JAXA precipitation image",
       "JAXA 降水可視化"
     ),
@@ -165,20 +180,17 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const jaxaTimeseriesTasks = [
     createJaxaTask(
-      () => jaxa.getTimeseriesNdvi(latitude, longitude, radiusM, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesNdvi(latitude, longitude, radiusM, tsYears, { timeout: timeseriesTimeout }),
       "JAXA NDVI timeseries",
       "NDVI トレンド"
     ),
     createJaxaTask(
-      () => jaxa.getTimeseriesLst(latitude, longitude, radiusM, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesLst(latitude, longitude, radiusM, tsYears, { timeout: timeseriesTimeout }),
       "JAXA LST timeseries",
       "温度トレンド"
     ),
     createJaxaTask(
-      () => jaxa.getTimeseriesPrecipitation(latitude, longitude, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesPrecipitation(latitude, longitude, tsYears, { timeout: timeseriesTimeout }),
       "JAXA precip timeseries",
       "降水トレンド"
     ),
@@ -251,11 +263,20 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const dpfSearch = processResult(dpfResult, "MLIT DPF", "search", citations, errors);
   if (dpfSearch) dpfResults.search_results = dpfSearch;
 
+  // Process city2graph results
+  const [c2gProximityResult, c2gMorphologyResult, c2gIsochroneResult] = await city2graphPromise;
+  const city2graphResults: City2GraphResults = {
+    proximity: processResult(c2gProximityResult, "Overture Maps", "proximity", citations, errors),
+    morphology: processResult(c2gMorphologyResult, "Overture Maps", "morphology", citations, errors),
+    isochrone: processResult(c2gIsochroneResult, "OSM/city2graph", "isochrone", citations, errors),
+  };
+
   return {
     result: {
       jaxa: jaxaResults,
       geospatial: geospatialResults,
       dpf: dpfResults,
+      city2graph: city2graphResults,
       errors,
     },
     citations,

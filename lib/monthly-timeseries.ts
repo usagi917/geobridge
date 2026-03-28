@@ -5,9 +5,10 @@ export interface RawSpatialStatsSeries {
   mean?: unknown[];
   min?: unknown[];
   max?: unknown[];
+  unit?: string;
 }
 
-export function generateMonthLabels(startYear: number, count: number): string[] {
+function generateMonthLabels(startYear: number, count: number): string[] {
   const labels: string[] = [];
   let year = startYear;
   let month = 1;

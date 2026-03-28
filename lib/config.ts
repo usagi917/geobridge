@@ -54,7 +54,7 @@ export const CONFIG = {
     jaxaConcurrency: Math.max(1, getEnvNumber(process.env.JAXA_CONCURRENCY, 2)),
     jaxaRetryCount: Math.max(0, getEnvNumber(process.env.JAXA_RETRY_COUNT, 1)),
     jaxaMonthlyLagMonths: Math.max(1, getEnvNumber(process.env.JAXA_MONTHLY_LAG_MONTHS, 2)),
-    timeseriesTimeout: 60_000,
+    timeseriesTimeout: getEnvNumber(process.env.JAXA_TIMESERIES_TIMEOUT_MS, 120_000),
     landPriceHistoryConcurrency: getEnvNumber(process.env.MLIT_LAND_PRICE_HISTORY_CONCURRENCY, 3),
   },
   geocode: {
@@ -67,6 +67,13 @@ export const CONFIG = {
     landPriceHistoryYears: 10,
     // Keep in sync with the bundled geospatial MCP server's supported latest survey year.
     landPriceLatestYear: 2025,
+  },
+  city2graph: {
+    timeout: getEnvNumber(process.env.CITY2GRAPH_TIMEOUT_MS, 120_000),
+    enabled: process.env.CITY2GRAPH_ENABLED !== "false",
+    proximityRadiusM: 1000,
+    morphologyRadiusM: 500,
+    isochroneThresholds: [300, 600, 900] as const,
   },
   perspectives,
   perspectiveApiMap: {

@@ -60,7 +60,7 @@ export const structuredReportOutputJsonSchema = {
   },
 } as const;
 
-export const STRUCTURED_REPORT_SECTION_KEYS = [
+const STRUCTURED_REPORT_SECTION_KEYS = [
   "summary",
   "disaster_safety",
   "livability",
@@ -75,7 +75,7 @@ export function createEmptySection(): SectionContent {
   return { facts: [], gaps: [], risks: [] };
 }
 
-export function createEmptyStructuredReportOutput(): StructuredReportOutput {
+function createEmptyStructuredReportOutput(): StructuredReportOutput {
   return {
     summary: createEmptySection(),
     disaster_safety: createEmptySection(),
@@ -91,7 +91,7 @@ export function hasSectionContent(section: SectionContent | undefined): boolean 
   return section.facts.length > 0 || section.gaps.length > 0 || section.risks.length > 0;
 }
 
-export function hasStructuredReportContent(output: StructuredReportOutput): boolean {
+function hasStructuredReportContent(output: StructuredReportOutput): boolean {
   return STRUCTURED_REPORT_SECTION_KEYS.some((key) => hasSectionContent(output[key]));
 }
 
