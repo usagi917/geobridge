@@ -6,7 +6,7 @@ import type {
   IsochroneResult,
   ProximityFacility,
 } from "@/lib/city2graph/types";
-import { hasAnyCity2GraphData } from "@/lib/city2graph/data-status";
+import { shouldShowCity2GraphSection } from "@/lib/city2graph/data-status";
 import { ProximityCard } from "./proximity-card";
 import { MorphologyCard } from "./morphology-card";
 import { IsochroneMap } from "./maps/isochrone-map";
@@ -29,9 +29,11 @@ export function City2GraphSection({
   lat,
   lng,
 }: City2GraphSectionProps) {
-  if (!hasAnyCity2GraphData({ proximity: proximity ?? null, morphology: morphology ?? null, isochrone: isochrone ?? null })) {
+  if (!shouldShowCity2GraphSection(proximity, morphology, isochrone)) {
     return null;
   }
+
+  const hasBothCards = proximity != null && morphology != null;
 
   return (
     <section className="space-y-4">
@@ -47,7 +49,7 @@ export function City2GraphSection({
         />
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className={`grid gap-4 ${hasBothCards ? "md:grid-cols-2" : ""}`}>
         {proximity && <ProximityCard data={proximity} />}
         {morphology && <MorphologyCard data={morphology} />}
       </div>

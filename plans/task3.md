@@ -89,11 +89,11 @@
 
 ### 1-1. ProximityCard 刷新
 
-- [ ] **Red**: 刷新版 ProximityCard のロジックテストを書く
+- [x] **Red**: 刷新版 ProximityCard のロジックテストを書く
   - カテゴリ間の最寄り距離ソート順が正しいこと
   - tier 判定（〜300m: 近い, 〜800m: 普通, 800m〜: 遠い）が正しいこと
   - available / empty / unavailable で表示内容が異なること
-- [ ] **Green**: `proximity-card.tsx` を刷新
+- [x] **Green**: `proximity-card.tsx` を刷新
   - 全体スコアバッジ（score/100）を右上に縮小表示
   - カテゴリ一覧を横棒バー（CSS `w-[XX%]`）で距離比較に変更
     - バー幅 = `min(distance, 2000) / 2000 * 100%`（2km を上限とする）
@@ -101,14 +101,14 @@
   - 各行: アイコン + カテゴリ名 + 最寄り距離 + 件数 + tier バッジ
   - `unavailable` 状態: グレーアウト + 「データ未取得」テキスト
   - `empty` 状態: 破線バー + 「周辺に該当施設なし」テキスト
-- [ ] **Refactor**: 距離→バー幅変換ロジックを純関数に切り出す（テスト対象に追加）
+- [x] **Refactor**: 距離→バー幅変換ロジックを純関数に切り出す（テスト対象に追加）
 
 ### 1-2. MorphologyCard 刷新
 
-- [ ] **Red**: 刷新版 MorphologyCard のロジックテストを書く
+- [x] **Red**: 刷新版 MorphologyCard のロジックテストを書く
   - `normalizeMetric` を使った 3 指標のパーセンテージ変換が正しいこと
   - 段階ラベル（低/中/高）が閾値で正しく切り替わること
-- [ ] **Green**: `morphology-card.tsx` を刷新
+- [x] **Green**: `morphology-card.tsx` を刷新
   - `maturity_score` を右上に補助バッジとして縮小表示
   - 3 指標を縦並びの水平バーで表示:
     - 建物密度: `morphology-density` カラー、値 + 単位（棟/km²）+ 段階ラベル
@@ -117,14 +117,14 @@
   - バー幅 = `normalizeMetric(value, range) * 100%`
   - 各バーに `aria-label` を付与（例: 「建物密度: 3,200棟/km²（基準値の64%）」）
   - 空データ時: 「分析データなし」+ `role="status"` 表示
-- [ ] **Refactor**: MetricMini を削除し、新しいバー表示コンポーネントに統合
+- [x] **Refactor**: MetricMini を削除し、新しいバー表示コンポーネントに統合
 
 ### 1-3. report-view.tsx のレイアウト再構成
 
-- [ ] `report-view.tsx` から city2graph 関連のレンダリングを `City2GraphSection` に委譲
+- [x] `report-view.tsx` から city2graph 関連のレンダリングを `City2GraphSection` に委譲
   - 既存の ProximityCard / MorphologyCard / IsochroneMap の直接配置を削除
   - `<City2GraphSection>` を主要指標カードの直後に配置
-- [ ] セクション順序を plan.md 6.1 に合わせる:
+- [x] セクション順序を plan.md 6.1 に合わせる:
   1. ヘッダー（住所・座標等）
   2. 主要指標カード
   3. `<City2GraphSection>`（地図 + proximity + morphology）
@@ -132,24 +132,24 @@
   5. 衛星データオーバーレイ
   6. 本文セクション（7セクション）
   7. エラー / 出典
-- [ ] `City2GraphSection` に実際の刷新版カードを接続
+- [x] `City2GraphSection` に実際の刷新版カードを接続
 
 ### 1-4. フォールバック基本実装
 
-- [ ] **Red**: `City2GraphSection` の表示分岐テストを書く
+- [x] **Red**: `City2GraphSection` の表示分岐テストを書く
   - 全データあり → セクション表示
   - proximity のみ → セクション表示（proximity カードのみ）
   - morphology のみ → セクション表示（morphology カードのみ）
   - 全 null → セクション非表示
-- [ ] **Green**: `City2GraphSection` にフォールバックロジックを実装
+- [x] **Green**: `City2GraphSection` にフォールバックロジックを実装
   - 各子コンポーネントの条件付きレンダリング
   - 地図はこの Phase ではまだ既存コンポーネントをそのまま使用
 
 ### Phase 1 完了チェック
 
-- [ ] `pnpm test` — 全テストパス
-- [ ] `pnpm build` — ビルド成功
-- [ ] `pnpm lint` — lint エラーなし
+- [x] `pnpm test` — 全テストパス
+- [x] `pnpm build` — ビルド成功
+- [x] `pnpm lint` — lint エラーなし
 - [ ] 手動確認: 都市部データで proximity の横棒バー比較が見えること
 - [ ] 手動確認: morphology の 3 指標バーが見えること
 - [ ] 手動確認: city2graph セクションがレポート前半に表示されること

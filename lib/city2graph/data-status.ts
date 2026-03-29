@@ -1,6 +1,6 @@
 // データ状態の判定ロジック
 
-import type { ProximityCategory, City2GraphResults } from "./types";
+import type { ProximityCategory, ProximityResult, MorphologyResult, IsochroneResult, City2GraphResults } from "./types";
 
 export type DataStatus = "available" | "empty" | "unavailable";
 
@@ -18,4 +18,13 @@ export function hasAnyCity2GraphData(results: City2GraphResults): boolean {
   return results.proximity !== null
     || results.morphology !== null
     || results.isochrone !== null;
+}
+
+/** City2GraphSection を表示すべきか判定する */
+export function shouldShowCity2GraphSection(
+  proximity: ProximityResult | null | undefined,
+  morphology: MorphologyResult | null | undefined,
+  isochrone: IsochroneResult | null | undefined,
+): boolean {
+  return proximity != null || morphology != null || isochrone != null;
 }

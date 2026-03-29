@@ -160,6 +160,10 @@ import {
   getCategoryStatus,
   hasAnyCity2GraphData,
 } from "../lib/city2graph/data-status";
+import {
+  distanceToBarWidth,
+  getDistanceTier,
+} from "../lib/city2graph/proximity-utils";
 import type { City2GraphResults, ProximityCategory } from "../lib/city2graph/types";
 
 describe("data-status", () => {
@@ -225,5 +229,94 @@ describe("data-status", () => {
       };
       assert.equal(hasAnyCity2GraphData(results), false);
     });
+  });
+});
+
+// --- 1-1. ProximityCard ロジックテスト ---
+
+describe("proximity-utils", () => {
+  describe("distanceToBarWidth", () => {
+    test("0m → 0%", () => {
+      assert.equal(distanceToBarWidth(0), 0);
+    });
+
+    test("1000m → 50%", () => {
+      assert.equal(distanceToBarWidth(1000), 50);
+    });
+
+    test("2000m → 100%", () => {
+      assert.equal(distanceToBarWidth(2000), 100);
+    });
+
+    test("clamps above 2000m to 100%", () => {
+      assert.equal(distanceToBarWidth(5000), 100);
+    });
+
+    test("280m → 14%", () => {
+      assert.equal(distanceToBarWidth(280), 14);
+    });
+  });
+
+  describe("getDistanceTier", () => {
+    test("200m → 近い", () => {
+      assert.equal(getDistanceTier(200), "近い");
+    });
+
+    test("300m → 近い (boundary)", () => {
+      assert.equal(getDistanceTier(300), "近い");
+    });
+
+    test("301m → 普通", () => {
+      assert.equal(getDistanceTier(301), "普通");
+    });
+
+    test("800m → 普通 (boundary)", () => {
+      assert.equal(getDistanceTier(800), "普通");
+    });
+
+    test("801m → 遠い", () => {
+      assert.equal(getDistanceTier(801), "遠い");
+    });
+
+    test("2000m → 遠い", () => {
+      assert.equal(getDistanceTier(2000), "遠い");
+    });
+  });
+});
+
+// --- 1-4. City2GraphSection フォールバックテスト ---
+
+import { shouldShowCity2GraphSection } from "../lib/city2graph/data-status";
+import type { ProximityResult, MorphologyResult, IsochroneResult } from "../lib/city2graph/types";
+
+describe("City2GraphSection fallback logic", () => {
+  const mockProximity: ProximityResult = { categories: {}, score: 50, total_pois: 5 };
+  const mockMorphology: MorphologyResult = {
+    metrics: { building_count: 100, building_density_per_km2: 500, street_connectivity: 3.2, building_street_facing_ratio: 0.6 },
+    maturity_score: 55,
+  };
+  const mockIsochrone: IsochroneResult = { type: "FeatureCollection", features: [] };
+
+  test("all data → show section", () => {
+    assert.equal(
+      shouldShowCity2GraphSection(mockProximity, mockMorphology, mockIsochrone),
+      true,
+    );
+  });
+
+  test("proximity only → show section", () => {
+    assert.equal(shouldShowCity2GraphSection(mockProximity, null, null), true);
+  });
+
+  test("morphology only → show section", () => {
+    assert.equal(shouldShowCity2GraphSection(null, mockMorphology, null), true);
+  });
+
+  test("isochrone only → show section", () => {
+    assert.equal(shouldShowCity2GraphSection(null, null, mockIsochrone), true);
+  });
+
+  test("all null → hide section", () => {
+    assert.equal(shouldShowCity2GraphSection(null, null, null), false);
   });
 });
