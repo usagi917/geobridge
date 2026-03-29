@@ -1,6 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import { useState } from "react";
 import { MapContainer, TileLayer, Marker, Circle, Popup, GeoJSON } from "react-leaflet";
 import type { PathOptions } from "leaflet";
 import type { IsochroneResult, ProximityFacility } from "../../lib/city2graph/types";
@@ -31,6 +32,68 @@ function getIsochroneStyle(feature: GeoJSON.Feature): PathOptions {
     fillOpacity: config.fillOpacity,
     weight: 2,
   };
+}
+
+function MapLegend({
+  hasIsochrone,
+  presentCategories,
+}: {
+  hasIsochrone: boolean;
+  presentCategories: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const hasContent = hasIsochrone || presentCategories.length > 0;
+
+  if (!hasContent) return null;
+
+  return (
+    <div className="absolute bottom-3 right-3 z-[1000] rounded-lg bg-white/90 text-xs shadow-md">
+      {/* モバイル: トグルボタン、sm以上: 常時展開 */}
+      <button
+        type="button"
+        className="flex w-full items-center justify-between px-3 py-2 sm:hidden"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="凡例を開閉"
+      >
+        <span className="font-medium text-slate-600">凡例</span>
+        <span className={`ml-2 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+      </button>
+
+      <div className={`px-3 pb-2 ${open ? "" : "hidden"} sm:block sm:pt-2`}>
+        {hasIsochrone && (
+          <div className="mb-1.5 border-b border-slate-200 pb-1.5">
+            {Object.entries(ISOCHRONE_STYLES).map(([mins, { color }]) => (
+              <div key={mins} className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-3 w-3 rounded-sm"
+                  style={{ backgroundColor: color, opacity: 0.6 }}
+                />
+                <span>徒歩{mins}分</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {presentCategories.length > 0 && (
+          <div>
+            {presentCategories.map((key) => {
+              const cat = CATEGORIES.find((c) => c.key === key);
+              const color = CATEGORY_COLORS[key];
+              return (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span>{cat?.label ?? key}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function AnalysisMapInner({
@@ -118,38 +181,10 @@ export default function AnalysisMapInner({
         </MapContainer>
 
         {/* Legend */}
-        <div className="absolute bottom-3 right-3 z-[1000] rounded-lg bg-white/90 px-3 py-2 text-xs shadow-md">
-          {hasIsochrone && (
-            <div className="mb-1.5 border-b border-slate-200 pb-1.5">
-              {Object.entries(ISOCHRONE_STYLES).map(([mins, { color }]) => (
-                <div key={mins} className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block h-3 w-3 rounded-sm"
-                    style={{ backgroundColor: color, opacity: 0.6 }}
-                  />
-                  <span>徒歩{mins}分</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {presentCategories.length > 0 && (
-            <div>
-              {presentCategories.map((key) => {
-                const cat = CATEGORIES.find((c) => c.key === key);
-                const color = CATEGORY_COLORS[key];
-                return (
-                  <div key={key} className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span>{cat?.label ?? key}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <MapLegend
+          hasIsochrone={hasIsochrone}
+          presentCategories={presentCategories}
+        />
       </div>
     </div>
   );

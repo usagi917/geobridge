@@ -212,8 +212,8 @@
 - [x] city2graph セクションの縦積み表示を確認・調整
   - proximity + morphology: 1 列縦積み（sm 以下）— `md:grid-cols-2` で自動対応
   - 地図高さ: モバイルで 300px（デスクトップ 400px）— `h-[300px] sm:h-[400px]`
-- [ ] 凡例の折りたたみ実装
-  - モバイル: デフォルト折りたたみ、タップで展開
+- [x] 凡例の折りたたみ実装
+  - モバイル: デフォルト折りたたみ、タップで展開（`sm:hidden` トグルボタン + `sm:block` で制御）
   - デスクトップ: 常時表示
 - [x] バー表示が狭い画面で崩れないか確認
   - 最小幅でもラベルとバーが読めること — `text-sm` + `flex justify-between` で対応
@@ -234,11 +234,12 @@
 
 ### 3-3. 地図遅延ロード（Intersection Observer）
 
-- [ ] `useInView` フック（自前実装 or `react-intersection-observer` 追加判断）
-- [ ] city2graph セクションの地図を Intersection Observer でラップ
+- [x] `useInView` フック自前実装（`lib/hooks/use-in-view.ts`、外部依存不要）
+- [x] `AnalysisMap` を Intersection Observer でラップ
   - ビューポート外: skeleton 表示
-  - ビューポート内: MapContainer 生成
-- [ ] `pnpm build` でバンドルサイズ変化を確認
+  - ビューポート内: MapContainer 生成（rootMargin 200px で先読み）
+  - 一度 inView になったら disconnect（再非表示でもアンロードしない）
+- [x] `pnpm build` でビルド成功確認
 
 ### 3-4. アクセシビリティ対応
 
