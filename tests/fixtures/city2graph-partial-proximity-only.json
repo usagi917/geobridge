@@ -1,0 +1,26 @@
+{
+  "proximity": {
+    "categories": {
+      "grocery": {
+        "facilities": [
+          { "name": "イオン 練馬店", "distance_m": 550, "lat": 35.735, "lon": 139.652, "category": "grocery" }
+        ],
+        "count": 1
+      },
+      "convenience": {
+        "facilities": [
+          { "name": "セブンイレブン 練馬北町", "distance_m": 180, "lat": 35.736, "lon": 139.653, "category": "convenience" }
+        ],
+        "count": 1
+      },
+      "park": {
+        "facilities": [],
+        "count": 0
+      }
+    },
+    "score": 45,
+    "total_pois": 2
+  },
+  "morphology": null,
+  "isochrone": null
+}

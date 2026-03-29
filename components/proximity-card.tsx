@@ -63,7 +63,7 @@ export function ProximityCard({ data }: ProximityCardProps) {
                     </>
                   )}
                   {status === "empty" && (
-                    <span className="text-xs text-slate-400">周辺に該当施設なし</span>
+                    <span className="text-xs text-slate-400" role="status">周辺に該当施設なし</span>
                   )}
                 </div>
               </div>

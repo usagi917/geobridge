@@ -50,18 +50,20 @@ export default function AnalysisMapInner({
     : [];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-      <h3 className="mb-4 text-lg font-bold text-slate-900">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
+      <h3 className="mb-3 text-lg font-bold text-slate-900 sm:mb-4">
         {hasIsochrone ? "分析地図（徒歩圏 + POI）" : "分析地点マップ"}
       </h3>
       <div
         className="relative overflow-hidden rounded-xl border border-slate-200"
+        role="img"
         aria-label="分析地点と周辺施設の地図"
       >
         <MapContainer
           center={[lat, lng]}
           zoom={zoom}
-          style={{ height: 400, width: "100%" }}
+          className="h-[300px] sm:h-[400px]"
+          style={{ width: "100%" }}
           scrollWheelZoom={false}
         >
           <TileLayer

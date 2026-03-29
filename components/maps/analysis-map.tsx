@@ -6,7 +6,7 @@ const AnalysisMapInner = dynamic<AnalysisMapInnerProps>(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+      <div className="flex h-[300px] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 sm:h-[400px]">
         <span className="text-sm text-slate-400">分析地図を読み込み中...</span>
       </div>
     ),

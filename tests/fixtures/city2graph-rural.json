@@ -1,0 +1,55 @@
+{
+  "proximity": {
+    "categories": {
+      "grocery": {
+        "facilities": [
+          { "name": "Aコープ 山田店", "distance_m": 1800, "lat": 34.85, "lon": 136.52, "category": "grocery" }
+        ],
+        "count": 1
+      },
+      "hospital": {
+        "facilities": [],
+        "count": 0
+      },
+      "school": {
+        "facilities": [
+          { "name": "山田小学校", "distance_m": 1200, "lat": 34.852, "lon": 136.518, "category": "school" }
+        ],
+        "count": 1
+      },
+      "convenience": {
+        "facilities": [],
+        "count": 0
+      },
+      "park": {
+        "facilities": [],
+        "count": 0
+      },
+      "restaurant": {
+        "facilities": [],
+        "count": 0
+      }
+    },
+    "score": 18,
+    "total_pois": 2
+  },
+  "morphology": {
+    "metrics": {
+      "building_count": 15,
+      "building_density_per_km2": 120,
+      "street_connectivity": 1.3,
+      "building_street_facing_ratio": 0.08
+    },
+    "maturity_score": 12
+  },
+  "isochrone": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "threshold_seconds": 300, "threshold_minutes": 5 },
+        "geometry": { "type": "Polygon", "coordinates": [[[136.519, 34.849], [136.521, 34.849], [136.521, 34.851], [136.519, 34.851], [136.519, 34.849]]] }
+      }
+    ]
+  }
+}
