@@ -1,13 +1,7 @@
 import L from "leaflet";
+import { CATEGORY_COLORS } from "../../lib/city2graph/colors";
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  grocery: "#10b981",
-  hospital: "#ef4444",
-  school: "#3b82f6",
-  convenience: "#f59e0b",
-  park: "#22c55e",
-  restaurant: "#f97316",
-};
+export { CATEGORY_COLORS };
 
 // Fix default marker icon issue with webpack/next.js
 export const defaultIcon = L.icon({

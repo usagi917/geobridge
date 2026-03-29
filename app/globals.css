@@ -6,4 +6,22 @@
   --color-terra-500: #14b8a6;
   --color-terra-600: #0d9488;
   --color-terra-700: #0f766e;
+
+  /* city2graph: 到達圏 */
+  --color-isochrone-5: #22c55e;
+  --color-isochrone-10: #eab308;
+  --color-isochrone-15: #ef4444;
+
+  /* city2graph: POI カテゴリ */
+  --color-poi-grocery: #10b981;
+  --color-poi-hospital: #ef4444;
+  --color-poi-school: #3b82f6;
+  --color-poi-convenience: #f59e0b;
+  --color-poi-park: #22c55e;
+  --color-poi-restaurant: #f97316;
+
+  /* city2graph: 街区構造 */
+  --color-morphology-density: #6366f1;
+  --color-morphology-connectivity: #8b5cf6;
+  --color-morphology-facing: #a78bfa;
 }

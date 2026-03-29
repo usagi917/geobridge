@@ -19,9 +19,7 @@ import {
 } from "./charts/chart-section";
 import { LocationMap } from "./maps/location-map";
 import { SatelliteOverlayMap } from "./maps/satellite-overlay-map";
-import { ProximityCard } from "./proximity-card";
-import { MorphologyCard } from "./morphology-card";
-import { IsochroneMap } from "./maps/isochrone-map";
+import { City2GraphSection } from "./city2graph-section";
 import type { ProximityResult, MorphologyResult, IsochroneResult, ProximityFacility } from "@/lib/city2graph/types";
 
 interface ReportViewProps {
@@ -152,17 +150,16 @@ export function ReportView({ report }: ReportViewProps) {
         proximityFacilities={allFacilities.length > 0 ? allFacilities : undefined}
       />
 
-      {/* city2graph sections */}
-      {proximityData && <ProximityCard data={proximityData} />}
-      {morphologyData && <MorphologyCard data={morphologyData} />}
-      {isochroneData && isochroneData.features.length > 0 && (
-        <IsochroneMap
-          latitude={report.input.latitude}
-          longitude={report.input.longitude}
-          isochrone={isochroneData}
-          facilities={allFacilities.length > 0 ? allFacilities : undefined}
-        />
-      )}
+      {/* city2graph section */}
+      <City2GraphSection
+        proximity={proximityData ?? null}
+        morphology={morphologyData ?? null}
+        isochrone={isochroneData ?? null}
+        facilities={allFacilities}
+        lat={report.input.latitude}
+        lng={report.input.longitude}
+        radiusM={report.input.radius_m}
+      />
 
       {/* Trend charts */}
       <ChartSection

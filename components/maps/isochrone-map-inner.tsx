@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup, GeoJSON } from "react-leaflet";
 import type { PathOptions } from "leaflet";
 import type { IsochroneResult, ProximityFacility } from "../../lib/city2graph/types";
+import { ISOCHRONE_COLORS } from "../../lib/city2graph/colors";
 import { defaultIcon, getCategoryIcon } from "./map-icons";
 
 export interface IsochroneMapInnerProps {
@@ -14,9 +15,9 @@ export interface IsochroneMapInnerProps {
 }
 
 const ISOCHRONE_STYLES: Record<number, { color: string; fillOpacity: number }> = {
-  5: { color: "#22c55e", fillOpacity: 0.2 },
-  10: { color: "#eab308", fillOpacity: 0.15 },
-  15: { color: "#ef4444", fillOpacity: 0.12 },
+  5: { color: ISOCHRONE_COLORS[5], fillOpacity: 0.2 },
+  10: { color: ISOCHRONE_COLORS[10], fillOpacity: 0.15 },
+  15: { color: ISOCHRONE_COLORS[15], fillOpacity: 0.12 },
 };
 
 function getStyle(feature: GeoJSON.Feature): PathOptions {
