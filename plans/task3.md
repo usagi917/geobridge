@@ -160,46 +160,45 @@
 
 ### 2-1. AnalysisMap コンポーネントの新設
 
-- [ ] `components/maps/analysis-map-inner.tsx` を新設
+- [x] `components/maps/analysis-map-inner.tsx` を新設
   - props: `{ lat, lng, radiusM, isochrone, facilities }`
   - isochrone あり: 徒歩圏ポリゴン（5/10/15分）+ 半径円（dashArray 点線）+ POI マーカー
   - isochrone なし: 半径円（実線）+ POI マーカー（LocationMap 同等）
   - zoom: isochrone あり → 14, なし → 15
   - 凡例: 地図内に到達圏 + POI カテゴリの凡例を配置
   - カラーは `colors.ts` から取得
-- [ ] `components/maps/analysis-map.tsx` を新設
+- [x] `components/maps/analysis-map.tsx` を新設
   - `next/dynamic({ ssr: false })` でラップ
   - loading skeleton 表示
-- [ ] `City2GraphSection` に `AnalysisMap` を接続
+- [x] `City2GraphSection` に `AnalysisMap` を接続
 
 ### 2-2. 凡例の統合
 
-- [ ] 到達圏の凡例を地図内に移動
+- [x] 到達圏の凡例を地図内に移動
   - 5分 / 10分 / 15分 のテキストラベルを必ず併記（アクセシビリティ要件）
   - 凡例位置: 地図右下（Leaflet control position: bottomright）
-- [ ] POI カテゴリ凡例を地図内に追加
+- [x] POI カテゴリ凡例を地図内に追加
   - `categories.ts` からラベル・色を取得
   - 折りたたみ可能にする（モバイル対応準備）
 
 ### 2-3. City2GraphSection 内の連続配置完成
 
-- [ ] 地図 → カード群の配置を完成させる
+- [x] 地図 → カード群の配置を完成させる
   - デスクトップ: 地図（全幅）→ proximity + morphology（2列並列）
   - セクション全体を視覚的なまとまり（背景色 or ボーダー）で囲む
-- [ ] フォールバック 8 パターンの表示を確認
+- [x] フォールバック 8 パターンの表示を確認
   - plan.md 8.5 のマトリクスに沿って、各パターンの地図表示を実装
 
 ### 2-4. 既存地図コンポーネントの整理
 
-- [ ] `report-view.tsx` から `LocationMap` / `IsochroneMap` の単独使用箇所を確認
-- [ ] city2graph セクション以外で使われていなければ、削除候補としてマーク（コメント）
-  - 実際の削除は Phase 2 完了後に判断
+- [x] `report-view.tsx` から `LocationMap` / `IsochroneMap` の単独使用箇所を確認
+- [x] `LocationMap` は概要マップとして report-view.tsx で継続使用。`IsochroneMap` は city2graph セクション内の `AnalysisMap` に統合完了。city2graph セクション以外で `IsochroneMap` は未使用。
 
 ### Phase 2 完了チェック
 
-- [ ] `pnpm test` — 全テストパス
-- [ ] `pnpm build` — ビルド成功
-- [ ] `pnpm lint` — lint エラーなし
+- [x] `pnpm test` — 全テストパス
+- [x] `pnpm build` — ビルド成功
+- [x] `pnpm lint` — lint エラーなし
 - [ ] 手動確認: isochrone ありで統合地図が表示されること
 - [ ] 手動確認: isochrone なしで LocationMap 相当のフォールバックが表示されること
 - [ ] 手動確認: 凡例が地図内に統合されていること

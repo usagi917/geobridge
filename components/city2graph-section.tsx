@@ -9,7 +9,7 @@ import type {
 import { shouldShowCity2GraphSection } from "@/lib/city2graph/data-status";
 import { ProximityCard } from "./proximity-card";
 import { MorphologyCard } from "./morphology-card";
-import { IsochroneMap } from "./maps/isochrone-map";
+import { AnalysisMap } from "./maps/analysis-map";
 
 interface City2GraphSectionProps {
   proximity: ProximityResult | null | undefined;
@@ -28,22 +28,24 @@ export function City2GraphSection({
   facilities,
   lat,
   lng,
+  radiusM,
 }: City2GraphSectionProps) {
   if (!shouldShowCity2GraphSection(proximity, morphology, isochrone)) {
     return null;
   }
 
   const hasBothCards = proximity != null && morphology != null;
+  const showMap = isochrone != null || (facilities.length > 0);
 
   return (
     <section className="space-y-4">
       <h3 className="text-lg font-bold text-slate-900">都市構造分析</h3>
 
-      {/* Phase 2 で AnalysisMap に置換予定 */}
-      {isochrone && isochrone.features.length > 0 && (
-        <IsochroneMap
-          latitude={lat}
-          longitude={lng}
+      {showMap && (
+        <AnalysisMap
+          lat={lat}
+          lng={lng}
+          radiusM={radiusM}
           isochrone={isochrone}
           facilities={facilities.length > 0 ? facilities : undefined}
         />
