@@ -9,6 +9,7 @@ export async function allSettledWithConcurrency<T>(
   if (tasks.length === 0) return [];
 
   const results: Array<PromiseSettledResult<T>> = new Array(tasks.length);
+  const effectiveConcurrency = Math.max(1, concurrency);
   let nextIndex = 0;
 
   async function worker(): Promise<void> {
@@ -31,7 +32,7 @@ export async function allSettledWithConcurrency<T>(
   }
 
   await Promise.all(
-    Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker())
+    Array.from({ length: Math.min(effectiveConcurrency, tasks.length) }, () => worker())
   );
 
   return results;
@@ -39,8 +40,9 @@ export async function allSettledWithConcurrency<T>(
 
 /**
  * Map items with limited concurrency, collecting results in order.
- * Uses allSettled internally — individual mapper failures are collected,
- * not thrown, so all items get a chance to run.
+ * Uses allSettled internally so all items get a chance to run, but
+ * throws on the first failure encountered when collecting results.
+ * Use allSettledWithConcurrency directly if you need individual failure inspection.
  */
 export async function mapWithConcurrency<T, R>(
   items: T[],

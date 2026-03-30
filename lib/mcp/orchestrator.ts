@@ -4,7 +4,7 @@ import * as dpf from "./dpf-client";
 import * as city2graph from "../city2graph/client";
 import { withTimeout } from "./utils";
 import { CONFIG, type Perspective } from "../config";
-import type { GeospatialCallResult, OrchestratorResult } from "./types";
+import type { GeospatialCallResult, LandPriceHistoryPoint, OrchestratorResult } from "./types";
 import type { City2GraphResults } from "../city2graph/types";
 import { CitationTracker } from "../report/citations";
 import { allSettledWithConcurrency } from "../utils/concurrency";
@@ -135,32 +135,34 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
       "MLIT 行政データ"
     ),
     tracked(withTimeout(dpf.searchByLocation(latitude, longitude), timeout, "DPF search"), "MLIT DPF"),
-    tracked(
-      targetApis.includes(3)
-        ? geospatial.getLandPricePoint(
-            latitude,
-            longitude,
-            CONFIG.report.landPriceLatestYear,
-            {
-              distance: landPriceDistance,
-              timeout: geospatialLandPriceTimeout,
-              timeoutLabel: "MLIT land price",
-            }
-          )
-        : Promise.resolve({ data: null, errors: [] }),
-      "地価"
-    ),
-    tracked(
-      withTimeout(
-        geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear, {
-          distance: landPriceDistance,
-          timeout: geospatialLandPriceTimeout,
-        }),
-        timeseriesTimeout,
-        "MLIT land price history"
-      ),
-      "地価推移"
-    ),
+    ...(targetApis.includes(3)
+      ? [
+          tracked(
+            geospatial.getLandPricePoint(
+              latitude,
+              longitude,
+              CONFIG.report.landPriceLatestYear,
+              {
+                distance: landPriceDistance,
+                timeout: geospatialLandPriceTimeout,
+                timeoutLabel: "MLIT land price",
+              }
+            ),
+            "地価"
+          ),
+          tracked(
+            withTimeout(
+              geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear, {
+                distance: landPriceDistance,
+                timeout: geospatialLandPriceTimeout,
+              }),
+              timeseriesTimeout,
+              "MLIT land price history"
+            ),
+            "地価推移"
+          ),
+        ]
+      : []),
   ]);
 
   const jaxaStatsTasks = [
@@ -233,12 +235,16 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const [ndviImageResult, lstImageResult, precipImageResult] = jaxaImageResults;
   const [ndviTimeseriesResult, lstTimeseriesResult, precipTimeseriesResult] = jaxaTimeseriesResults;
 
-  const [
-    multiApiResult,
-    dpfResult,
-    landPriceResult,
-    landPriceHistoryResult,
-  ] = await nonJaxaResultsPromise;
+  const nonJaxaResults = await nonJaxaResultsPromise;
+  const hasLandPrice = targetApis.includes(3);
+  const multiApiResult = nonJaxaResults[0];
+  const dpfResult = nonJaxaResults[1];
+  const landPriceResult = hasLandPrice
+    ? nonJaxaResults[2] as PromiseSettledResult<GeospatialCallResult<Record<string, unknown>>>
+    : undefined;
+  const landPriceHistoryResult = hasLandPrice
+    ? nonJaxaResults[3] as PromiseSettledResult<GeospatialCallResult<LandPriceHistoryPoint[]>>
+    : undefined;
 
   // Process JAXA results
   const jaxaResults = {
@@ -273,25 +279,29 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
     if (multiApiRecord["4"]) geospatialResults.urban_planning = multiApiRecord["4"];
     if (multiApiRecord["5"]) geospatialResults.zoning = multiApiRecord["5"];
   }
-  const landPrice = processGeospatialResult(
-    landPriceResult,
-    "MLIT Geospatial 地価",
-    "get_land_price_point_by_location",
-    citations,
-    errors
-  );
-  if (landPrice) {
-    geospatialResults.land_price = landPrice;
+  if (landPriceResult) {
+    const landPrice = processGeospatialResult(
+      landPriceResult,
+      "MLIT Geospatial 地価",
+      "get_land_price_point_by_location",
+      citations,
+      errors
+    );
+    if (landPrice) {
+      geospatialResults.land_price = landPrice;
+    }
   }
-  const landPriceHistory = processGeospatialResult(
-    landPriceHistoryResult,
-    "MLIT Geospatial 地価履歴",
-    "land_price_history",
-    citations,
-    errors
-  );
-  if (landPriceHistory) {
-    geospatialResults.land_price_history = landPriceHistory;
+  if (landPriceHistoryResult) {
+    const landPriceHistory = processGeospatialResult(
+      landPriceHistoryResult,
+      "MLIT Geospatial 地価履歴",
+      "land_price_history",
+      citations,
+      errors
+    );
+    if (landPriceHistory) {
+      geospatialResults.land_price_history = landPriceHistory;
+    }
   }
 
   // Process DPF results
