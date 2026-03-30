@@ -68,6 +68,13 @@ const generatedChartSchema = z.object({
   imageDataUrl: z.string(),
 });
 
+const generatedGraphSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().optional(),
+  imageDataUrl: z.string(),
+});
+
 const timeseriesDataPointSchema = z.object({
   date: z.string(),
   mean: z.number(),
@@ -153,6 +160,7 @@ const summaryDataSchema = z.object({
   visualizations: z.array(jaxaVisualizationSchema).default([]).optional(),
   generated_maps: z.array(generatedMapSchema).default([]).optional(),
   generated_charts: z.array(generatedChartSchema).default([]).optional(),
+  generated_graphs: z.array(generatedGraphSchema).default([]).optional(),
   timeseries: z.object({
     ndvi: normalizedTimeseriesSchema.optional(),
     lst: normalizedTimeseriesSchema.optional(),
@@ -216,3 +224,4 @@ export type SummaryData = z.infer<typeof summaryDataSchema>;
 export type JaxaVisualization = z.infer<typeof jaxaVisualizationSchema>;
 export type GeneratedMap = z.infer<typeof generatedMapSchema>;
 export type GeneratedChart = z.infer<typeof generatedChartSchema>;
+export type GeneratedGraph = z.infer<typeof generatedGraphSchema>;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { coerceNumericValue } from "@/lib/coerce-number";
-import type { Report } from "@/lib/report/schema";
+import type { GeneratedGraph, Report } from "@/lib/report/schema";
 import { aggregateSources } from "@/lib/report/citations";
 import { recoverSectionsForDisplay } from "@/lib/report/display-recovery";
 import { sanitizeLandPriceHistory as sanitizeLandPriceHistoryData } from "@/lib/report/sanitize";
@@ -21,6 +21,7 @@ import { LocationMap } from "./maps/location-map";
 import { SatelliteOverlayMap } from "./maps/satellite-overlay-map";
 import { City2GraphSection } from "./city2graph-section";
 import type { ProximityResult, MorphologyResult, IsochroneResult, ProximityFacility } from "@/lib/city2graph/types";
+import { GraphVisualizations } from "./graph-visualizations";
 
 interface ReportViewProps {
   report: Report;
@@ -59,6 +60,7 @@ export function ReportView({ report }: ReportViewProps) {
   const timeseries = summaryData?.timeseries as ChartSectionTimeseries | undefined;
   const annualPrecipitation = summaryData?.annual_precipitation as AnnualPrecipitationEntry | undefined;
   const generatedCharts = summaryData?.generated_charts as GeneratedChartEntry[] | undefined;
+  const generatedGraphs = summaryData?.generated_graphs as GeneratedGraph[] | undefined;
   const landPriceHistoryRaw = sanitizeLandPriceHistoryData(
     summaryData?.land_price_history as LandPricePoint[] | undefined
   );
@@ -193,6 +195,11 @@ export function ReportView({ report }: ReportViewProps) {
         </section>
       )}
 
+      {/* Urban graph analysis */}
+      {generatedGraphs && generatedGraphs.length > 0 && (
+        <GraphVisualizations graphs={generatedGraphs} />
+      )}
+
       {/* Report sections */}
       {sectionConfig.map(({ key, title }) => (
         <ReportSection
@@ -252,4 +259,3 @@ type ChartSectionTimeseries = {
   lst?: TimeseriesEntry;
   precipitation?: TimeseriesEntry;
 };
-
