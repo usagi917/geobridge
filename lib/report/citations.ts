@@ -50,7 +50,29 @@ export class CitationTracker {
   }
 }
 
-export function pickWorseStatus(current: Source["status"], next: Source["status"]): Source["status"] {
+export function aggregateSources(sources: Source[]): Source[] {
+  const aggregated = new Map<string, Source>();
+
+  for (const source of sources) {
+    const key = `${source.name}\u0000${source.url ?? ""}`;
+    const existing = aggregated.get(key);
+
+    if (!existing) {
+      aggregated.set(key, { ...source });
+      continue;
+    }
+
+    existing.status = pickWorseStatus(existing.status, source.status);
+    existing.count = (existing.count ?? 1) + (source.count ?? 1);
+    if (source.fetched_at > existing.fetched_at) {
+      existing.fetched_at = source.fetched_at;
+    }
+  }
+
+  return Array.from(aggregated.values());
+}
+
+function pickWorseStatus(current: Source["status"], next: Source["status"]): Source["status"] {
   const severity: Record<Source["status"], number> = {
     success: 0,
     partial: 1,

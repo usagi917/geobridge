@@ -108,6 +108,7 @@ export interface OrchestratorResult {
   jaxa: JaxaResults;
   geospatial: GeospatialResults;
   dpf: DpfResults;
+  city2graph?: import("../city2graph/types").City2GraphResults;
   errors: Array<{ source: string; tool: string; message: string }>;
 }
 

@@ -39,7 +39,7 @@ If some external data sources fail, the UI still renders partial results togethe
 | Maps | React Leaflet + Leaflet + OpenStreetMap |
 | Storage | SQLite (`terrascore.db`) |
 | MCP Client | `@modelcontextprotocol/sdk` + STDIO transport |
-| LLM | Ollama (default `qwen3.5:35b-a3b`) / OpenAI `gpt-4o` fallback |
+| LLM | Ollama (default `qwen3.5:35b-a3b`) / OpenAI `gpt-5-nano` fallback |
 | Python utilities | `uv` + matplotlib / numpy / Pillow |
 
 ## Repository Layout
@@ -88,6 +88,12 @@ At minimum, configure the following in `.env.local`.
 | `MLIT_DPF_API_KEY` | Yes | MLIT DPF MCP |
 | `OLLAMA_BASE_URL` | No | Ollama endpoint, default `http://localhost:11434` |
 | `OLLAMA_MODEL` | No | Default `qwen3.5:35b-a3b` |
+| `OPENAI_BASE_URL` | No | Default `https://api.openai.com/v1`. Use a regional endpoint such as `https://jp.api.openai.com/v1` if needed |
+| `OPENAI_MODEL` | No | Default `gpt-5-nano` |
+| `OPENAI_REASONING_EFFORT` | No | Default `low`. One of `none`, `minimal`, `low`, `medium`, `high`, `xhigh` |
+| `OPENAI_VERBOSITY` | No | Default `low`. One of `low`, `medium`, `high` |
+| `OPENAI_TIMEOUT_MS` | No | Timeout for the OpenAI fallback in milliseconds. Default `60000` |
+| `OPENAI_MAX_TOKENS` | No | `max_output_tokens` for the OpenAI fallback. Default `1536` |
 | `OPENAI_API_KEY` | No | Fallback when Ollama fails |
 
 Notes:
@@ -95,6 +101,8 @@ Notes:
 - `./scripts/setup-mcp-servers.sh` prepares three servers under `mcp-servers/`: JAXA, MLIT Geospatial, and MLIT DPF.
 - Report generation also invokes `lib/visualize/generate.py` through `uv run --directory ./lib/visualize`.
 - The first successful analysis creates `terrascore.db` in the repository root.
+- The OpenAI fallback uses the `Responses API` with `store: false` and structured JSON output.
+- For production, prefer pinning `OPENAI_MODEL` to a snapshot instead of relying on an alias.
 
 ## Development Commands
 

@@ -105,7 +105,50 @@ const landPriceHistoryPointSchema = z.object({
   address: z.string().optional(),
 });
 
-export const summaryDataSchema = z.object({
+const proximityFacilitySchema = z.object({
+  name: z.string(),
+  distance_m: z.number().min(0),
+  lat: z.number(),
+  lon: z.number(),
+  category: z.string(),
+});
+
+const proximityCategorySchema = z.object({
+  facilities: z.array(proximityFacilitySchema),
+  count: z.number().int().min(0),
+});
+
+const proximityResultSchema = z.object({
+  categories: z.record(proximityCategorySchema),
+  score: z.number().min(0).max(100),
+  total_pois: z.number().int().min(0),
+});
+
+const morphologyMetricsSchema = z.object({
+  building_count: z.number().int().min(0),
+  building_density_per_km2: z.number().min(0),
+  street_connectivity: z.number().min(0),
+  building_street_facing_ratio: z.number().min(0).max(1),
+});
+
+const morphologyResultSchema = z.object({
+  metrics: morphologyMetricsSchema,
+  maturity_score: z.number().min(0).max(100),
+});
+
+const isochroneResultSchema = z.object({
+  type: z.literal("FeatureCollection"),
+  features: z.array(z.object({
+    type: z.literal("Feature"),
+    properties: z.object({
+      threshold_seconds: z.number(),
+      threshold_minutes: z.number(),
+    }),
+    geometry: z.record(z.unknown()),
+  })),
+});
+
+const summaryDataSchema = z.object({
   elevation: summaryMetricSchema.optional(),
   ndvi: summaryMetricSchema.optional(),
   lst: summaryMetricSchema.optional(),
@@ -125,16 +168,19 @@ export const summaryDataSchema = z.object({
   }).optional(),
   annual_precipitation: annualPrecipitationSchema.optional(),
   land_price_history: z.array(landPriceHistoryPointSchema).optional(),
+  proximity: proximityResultSchema.optional(),
+  morphology: morphologyResultSchema.optional(),
+  isochrone: isochroneResultSchema.optional(),
 }).passthrough();
 
-export const summarySectionContentSchema = sectionContentSchema.extend({
+const summarySectionContentSchema = sectionContentSchema.extend({
   data: summaryDataSchema.optional(),
 });
 
 export const reportInputSchema = z.object({
   address: z.string(),
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
   radius_m: z.number().int().min(1).max(400).default(400),
   perspective: z.enum(["comprehensive", "child_rearing", "disaster", "livability"]).default("comprehensive"),
 });

@@ -9,7 +9,58 @@ export interface StructuredReportOutput {
   data_gaps: SectionContent;
 }
 
-export const STRUCTURED_REPORT_SECTION_KEYS = [
+function createStructuredSectionJsonSchema(description: string) {
+  return {
+    type: "object",
+    description,
+    additionalProperties: false,
+    required: ["facts", "gaps", "risks"],
+    properties: {
+      facts: {
+        type: "array",
+        description: "Observed facts grounded in the normalized input data.",
+        items: { type: "string" },
+      },
+      gaps: {
+        type: "array",
+        description: "Missing or unavailable data that limited the analysis.",
+        items: { type: "string" },
+      },
+      risks: {
+        type: "array",
+        description: "Cautions, limits, or follow-up checks the user should keep in mind.",
+        items: { type: "string" },
+      },
+    },
+  } as const;
+}
+
+export const structuredReportOutputJsonSchema = {
+  name: "terrascore_structured_report",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "summary",
+      "disaster_safety",
+      "livability",
+      "environment",
+      "regional_context",
+      "data_gaps",
+    ],
+    properties: {
+      summary: createStructuredSectionJsonSchema("Top-level summary for the target location."),
+      disaster_safety: createStructuredSectionJsonSchema("Disaster and safety observations."),
+      livability: createStructuredSectionJsonSchema("Daily livability observations."),
+      environment: createStructuredSectionJsonSchema("Natural environment observations."),
+      regional_context: createStructuredSectionJsonSchema("Regional context and planning observations."),
+      data_gaps: createStructuredSectionJsonSchema("Remaining blind spots and caution notes."),
+    },
+  },
+} as const;
+
+const STRUCTURED_REPORT_SECTION_KEYS = [
   "summary",
   "disaster_safety",
   "livability",
@@ -24,7 +75,7 @@ export function createEmptySection(): SectionContent {
   return { facts: [], gaps: [], risks: [] };
 }
 
-export function createEmptyStructuredReportOutput(): StructuredReportOutput {
+function createEmptyStructuredReportOutput(): StructuredReportOutput {
   return {
     summary: createEmptySection(),
     disaster_safety: createEmptySection(),
@@ -40,7 +91,7 @@ export function hasSectionContent(section: SectionContent | undefined): boolean 
   return section.facts.length > 0 || section.gaps.length > 0 || section.risks.length > 0;
 }
 
-export function hasStructuredReportContent(output: StructuredReportOutput): boolean {
+function hasStructuredReportContent(output: StructuredReportOutput): boolean {
   return STRUCTURED_REPORT_SECTION_KEYS.some((key) => hasSectionContent(output[key]));
 }
 

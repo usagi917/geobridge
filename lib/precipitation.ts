@@ -32,7 +32,7 @@ export function getMonthlyHoursFromRange([start, end]: [string, string]): number
     return 24;
   }
 
-  return Math.round(diffHours + 1 / 3600);
+  return Math.round(diffHours);
 }
 
 function convertRateValue(value: number | undefined, hours: number): number | undefined {

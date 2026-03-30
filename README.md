@@ -39,7 +39,7 @@ TerraScore は、住所または緯度経度から分析ジョブを作成し、
 | Maps | React Leaflet + Leaflet + OpenStreetMap |
 | Storage | SQLite (`terrascore.db`) |
 | MCP Client | `@modelcontextprotocol/sdk` + STDIO transport |
-| LLM | Ollama (`qwen3.5:35b-a3b` 既定) / OpenAI `gpt-4o` フォールバック |
+| LLM | Ollama (`qwen3.5:35b-a3b` 既定) / OpenAI `gpt-5-nano` フォールバック |
 | Python utilities | `uv` + matplotlib / numpy / Pillow |
 
 ## リポジトリ構成
@@ -88,6 +88,12 @@ pnpm dev
 | `MLIT_DPF_API_KEY` | Yes | MLIT DPF MCP 用 |
 | `OLLAMA_BASE_URL` | No | Ollama 接続先。既定は `http://localhost:11434` |
 | `OLLAMA_MODEL` | No | 既定は `qwen3.5:35b-a3b` |
+| `OPENAI_BASE_URL` | No | 既定は `https://api.openai.com/v1`。地域エンドポイントを使う場合は `https://jp.api.openai.com/v1` のように指定 |
+| `OPENAI_MODEL` | No | 既定は `gpt-5-nano` |
+| `OPENAI_REASONING_EFFORT` | No | 既定は `low`。`none` / `minimal` / `low` / `medium` / `high` / `xhigh` |
+| `OPENAI_VERBOSITY` | No | 既定は `low`。`low` / `medium` / `high` |
+| `OPENAI_TIMEOUT_MS` | No | OpenAI フォールバックのタイムアウト。既定は `60000` |
+| `OPENAI_MAX_TOKENS` | No | OpenAI フォールバックの `max_output_tokens`。既定は `1536` |
 | `OPENAI_API_KEY` | No | Ollama 失敗時のフォールバック |
 
 補足:
@@ -95,6 +101,8 @@ pnpm dev
 - `./scripts/setup-mcp-servers.sh` は `mcp-servers/` に JAXA / MLIT Geospatial / MLIT DPF の 3 サーバーを準備します。
 - レポート生成時には `lib/visualize/generate.py` が `uv run --directory ./lib/visualize` 経由で呼ばれます。
 - 最初の分析成功時にルートディレクトリへ `terrascore.db` が作成されます。
+- OpenAI フォールバックは `Responses API` を使い、`store: false` と structured JSON output を前提にしています。
+- 本番運用では `OPENAI_MODEL` を alias ではなく snapshot に pin する構成を推奨します。
 
 ## 開発コマンド
 

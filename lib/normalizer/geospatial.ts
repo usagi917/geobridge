@@ -1,6 +1,7 @@
 import type { GeospatialResults } from "../mcp/types";
 import { coerceNumericValue } from "../coerce-number";
 import { extractLandPriceValue, extractLandPriceYear } from "../land-price";
+import { pickString } from "../utils/strings";
 import type { NormalizedGeospatial } from "./index";
 
 export function normalizeGeospatial(raw: GeospatialResults): NormalizedGeospatial {
@@ -185,15 +186,6 @@ function pickNumber(props: Record<string, unknown>, keys: string[]): number | un
   return undefined;
 }
 
-function pickString(props: Record<string, unknown>, keys: string[]): string | undefined {
-  for (const key of keys) {
-    const value = props[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
 
 const LIQUEFACTION_RISK_MAP: Record<string, string> = {
   "大": "液状化の可能性が高い",

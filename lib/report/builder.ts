@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import type { Report, ReportInput, SectionContent } from "./schema";
 import type { CitationTracker } from "./citations";
 import { sanitizeLandPricePoints, sanitizeLandPriceHistory } from "./sanitize";
@@ -68,7 +68,7 @@ export async function buildReport(
   ]);
 
   return {
-    id: uuidv4(),
+    id: randomUUID(),
     input,
     sections: {
       summary: mergeSectionWithData(
@@ -120,6 +120,9 @@ function mergeSectionWithData(
       timeseries: data.jaxa?.timeseries,
       annual_precipitation: annualPrecipitation,
       land_price_history: landPriceHistory.length > 0 ? landPriceHistory : undefined,
+      proximity: data.city2graph?.proximity,
+      morphology: data.city2graph?.morphology,
+      isochrone: data.city2graph?.isochrone,
     },
   };
 }

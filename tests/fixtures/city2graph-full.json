@@ -1,0 +1,77 @@
+{
+  "proximity": {
+    "categories": {
+      "grocery": {
+        "facilities": [
+          { "name": "マルエツ 芝浦店", "distance_m": 280, "lat": 35.6455, "lon": 139.7505, "category": "grocery" },
+          { "name": "まいばすけっと 芝浦3丁目", "distance_m": 420, "lat": 35.6448, "lon": 139.7498, "category": "grocery" }
+        ],
+        "count": 2
+      },
+      "hospital": {
+        "facilities": [
+          { "name": "芝浦クリニック", "distance_m": 350, "lat": 35.6460, "lon": 139.7510, "category": "hospital" }
+        ],
+        "count": 1
+      },
+      "school": {
+        "facilities": [
+          { "name": "芝浦小学校", "distance_m": 600, "lat": 35.6470, "lon": 139.7520, "category": "school" }
+        ],
+        "count": 1
+      },
+      "convenience": {
+        "facilities": [
+          { "name": "セブンイレブン 芝浦3丁目", "distance_m": 120, "lat": 35.6452, "lon": 139.7502, "category": "convenience" },
+          { "name": "ファミリーマート 芝浦店", "distance_m": 250, "lat": 35.6458, "lon": 139.7508, "category": "convenience" },
+          { "name": "ローソン 芝浦海岸通り", "distance_m": 380, "lat": 35.6445, "lon": 139.7495, "category": "convenience" }
+        ],
+        "count": 3
+      },
+      "park": {
+        "facilities": [
+          { "name": "芝浦中央公園", "distance_m": 450, "lat": 35.6465, "lon": 139.7515, "category": "park" }
+        ],
+        "count": 1
+      },
+      "restaurant": {
+        "facilities": [
+          { "name": "松屋 田町芝浦店", "distance_m": 200, "lat": 35.6453, "lon": 139.7503, "category": "restaurant" },
+          { "name": "日高屋 田町東口店", "distance_m": 310, "lat": 35.6462, "lon": 139.7512, "category": "restaurant" }
+        ],
+        "count": 2
+      }
+    },
+    "score": 78,
+    "total_pois": 10
+  },
+  "morphology": {
+    "metrics": {
+      "building_count": 245,
+      "building_density_per_km2": 3200,
+      "street_connectivity": 3.45,
+      "building_street_facing_ratio": 0.62
+    },
+    "maturity_score": 68
+  },
+  "isochrone": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "threshold_seconds": 300, "threshold_minutes": 5 },
+        "geometry": { "type": "Polygon", "coordinates": [[[139.749, 35.644], [139.751, 35.644], [139.751, 35.646], [139.749, 35.646], [139.749, 35.644]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "threshold_seconds": 600, "threshold_minutes": 10 },
+        "geometry": { "type": "Polygon", "coordinates": [[[139.748, 35.643], [139.752, 35.643], [139.752, 35.647], [139.748, 35.647], [139.748, 35.643]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "threshold_seconds": 900, "threshold_minutes": 15 },
+        "geometry": { "type": "Polygon", "coordinates": [[[139.747, 35.642], [139.753, 35.642], [139.753, 35.648], [139.747, 35.648], [139.747, 35.642]]] }
+      }
+    ]
+  }
+}

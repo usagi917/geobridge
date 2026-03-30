@@ -1,6 +1,7 @@
 import { normalizeJaxa } from "./jaxa";
 import { normalizeGeospatial } from "./geospatial";
 import { normalizeDpf } from "./dpf";
+import { normalizeCity2Graph, type NormalizedCity2Graph } from "./city2graph";
 import type { OrchestratorResult } from "../mcp/types";
 import type { ReportInput } from "../report/schema";
 import type { JaxaVisualization } from "../report/schema";
@@ -62,6 +63,7 @@ export interface NormalizedData {
   jaxa?: NormalizedJaxa;
   geospatial?: NormalizedGeospatial;
   dpf?: NormalizedDpf;
+  city2graph?: NormalizedCity2Graph;
 }
 
 export function normalizeAll(
@@ -73,5 +75,8 @@ export function normalizeAll(
     jaxa: normalizeJaxa(orchestratorResult.jaxa),
     geospatial: normalizeGeospatial(orchestratorResult.geospatial),
     dpf: normalizeDpf(orchestratorResult.dpf),
+    city2graph: orchestratorResult.city2graph
+      ? normalizeCity2Graph(orchestratorResult.city2graph)
+      : undefined,
   };
 }

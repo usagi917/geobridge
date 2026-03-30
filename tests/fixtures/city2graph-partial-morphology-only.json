@@ -1,0 +1,13 @@
+{
+  "proximity": null,
+  "morphology": {
+    "metrics": {
+      "building_count": 80,
+      "building_density_per_km2": 1200,
+      "street_connectivity": 2.1,
+      "building_street_facing_ratio": 0.35
+    },
+    "maturity_score": 42
+  },
+  "isochrone": null
+}

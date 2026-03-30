@@ -3,6 +3,7 @@ import { isOpenAIAvailable, generateWithOpenAI } from "./openai";
 import { getSystemPrompt, buildUserPrompt } from "./prompts";
 import type { NormalizedData } from "../normalizer";
 import type { Perspective } from "../config";
+import { formatPrecipitation } from "../utils/format";
 import {
   createEmptySection,
   hasSectionContent,
@@ -44,7 +45,8 @@ export async function generateReport(
       try {
         console.info("[report-generator] Falling back to OpenAI");
         const response = await generateWithOpenAI(userPrompt, systemPrompt, {
-          temperature: 0.3,
+          reasoningEffort: "low",
+          verbosity: "low",
         });
         return parseLLMResponse(response, normalizedData, address);
       } catch (openaiError) {
@@ -224,6 +226,28 @@ function createDataDrivenFallback(
     livability.facts.push(`関連行政データとして ${normalizedData.dpf.related_data.length} 件の候補情報を取得しました。`);
   }
 
+  // city2graph data
+  const CATEGORY_JA: Record<string, string> = {
+    grocery: "食料品店", hospital: "医療機関", school: "学校",
+    convenience: "コンビニ", park: "公園", restaurant: "飲食店",
+  };
+
+  const c2g = normalizedData.city2graph;
+  if (c2g?.proximity) {
+    livability.facts.push(`生活利便スコアは ${c2g.proximity.score}/100 です（Overture Maps POI分析）。`);
+    for (const [key, cat] of Object.entries(c2g.proximity.categories)) {
+      if (cat.facilities.length > 0) {
+        const label = CATEGORY_JA[key] ?? key;
+        livability.facts.push(`最寄りの${label}まで約 ${Math.round(cat.facilities[0].distance_m)}m です。`);
+      }
+    }
+  }
+
+  if (c2g?.morphology) {
+    regionalContext.facts.push(`街区成熟度スコアは ${c2g.morphology.maturity_score}/100 です（Overture Maps 建物・道路分析）。`);
+    regionalContext.facts.push(`建物密度は ${Math.round(c2g.morphology.metrics.building_density_per_km2)} 棟/km2 です。`);
+  }
+
   const missingDomains = [
     summary.facts.length === 0 ? "総合サマリー" : null,
     disasterSafety.facts.length === 0 ? "災害・安全性" : null,
@@ -288,6 +312,23 @@ function buildLlmInput(normalizedData: NormalizedData): Record<string, unknown> 
       land_price_history: sanitizeLandPriceHistory(normalizedData.geospatial.land_price_history).slice(-10),
     } : undefined,
     dpf: normalizedData.dpf,
+    city2graph: normalizedData.city2graph ? {
+      proximity_score: normalizedData.city2graph.proximity?.score,
+      nearest_facilities: normalizedData.city2graph.proximity
+        ? Object.fromEntries(
+            Object.entries(normalizedData.city2graph.proximity.categories)
+              .filter(([, cat]) => cat.facilities.length > 0)
+              .map(([key, cat]) => [key, {
+                nearest_distance_m: cat.facilities[0].distance_m,
+                count: cat.count,
+              }])
+          )
+        : undefined,
+      maturity_score: normalizedData.city2graph.morphology?.maturity_score,
+      building_density: normalizedData.city2graph.morphology?.metrics.building_density_per_km2,
+      street_connectivity: normalizedData.city2graph.morphology?.metrics.street_connectivity,
+      has_isochrone: !!normalizedData.city2graph.isochrone,
+    } : undefined,
   };
 }
 
@@ -344,9 +385,5 @@ function formatNumber(value: number, maximumFractionDigits: number = 1): string 
 }
 
 function formatPrecipitationValue(value: number): string {
-  const fractionDigits = Math.abs(value) < 0.1 ? 3 : 1;
-  return value.toLocaleString("ja-JP", {
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  });
+  return formatPrecipitation(value);
 }

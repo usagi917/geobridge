@@ -1,10 +1,23 @@
 const perspectives = ["comprehensive", "child_rearing", "disaster", "livability"] as const;
+const openaiReasoningEfforts = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
+const openaiVerbosityLevels = ["low", "medium", "high"] as const;
 
 export type Perspective = (typeof perspectives)[number];
+export type OpenAIReasoningEffort = (typeof openaiReasoningEfforts)[number];
+export type OpenAIVerbosity = (typeof openaiVerbosityLevels)[number];
 
 function getEnvNumber(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getEnvEnum<T extends readonly string[]>(
+  value: string | undefined,
+  allowed: T,
+  fallback: T[number]
+): T[number] {
+  if (!value) return fallback;
+  return allowed.includes(value as T[number]) ? (value as T[number]) : fallback;
 }
 
 export const CONFIG = {
@@ -15,9 +28,12 @@ export const CONFIG = {
     maxTokens: getEnvNumber(process.env.OLLAMA_MAX_TOKENS, 1536),
   },
   openai: {
-    model: process.env.OPENAI_MODEL || "gpt-4o",
+    baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+    model: process.env.OPENAI_MODEL || "gpt-5-nano",
     timeout: getEnvNumber(process.env.OPENAI_TIMEOUT_MS, 60_000),
     maxTokens: getEnvNumber(process.env.OPENAI_MAX_TOKENS, 1536),
+    reasoningEffort: getEnvEnum(process.env.OPENAI_REASONING_EFFORT, openaiReasoningEfforts, "low"),
+    verbosity: getEnvEnum(process.env.OPENAI_VERBOSITY, openaiVerbosityLevels, "low"),
   },
   mcp: {
     jaxa: {
@@ -33,13 +49,15 @@ export const CONFIG = {
       args: ["run", "--directory", "./mcp-servers/dpf", "python", "src/server.py"],
     },
     toolTimeout: 15_000,
+    geospatialMultiApiTimeout: getEnvNumber(process.env.MLIT_GEOSPATIAL_MULTI_API_TIMEOUT_MS, 40_000),
+    geospatialLandPriceTimeout: getEnvNumber(process.env.MLIT_GEOSPATIAL_LAND_PRICE_TIMEOUT_MS, 20_000),
     jaxaStatsTimeout: getEnvNumber(process.env.JAXA_STATS_TIMEOUT_MS, 60_000),
     jaxaImageTimeout: getEnvNumber(process.env.JAXA_IMAGE_TIMEOUT_MS, 90_000),
     jaxaConcurrency: Math.max(1, getEnvNumber(process.env.JAXA_CONCURRENCY, 2)),
     jaxaRetryCount: Math.max(0, getEnvNumber(process.env.JAXA_RETRY_COUNT, 1)),
     jaxaMonthlyLagMonths: Math.max(1, getEnvNumber(process.env.JAXA_MONTHLY_LAG_MONTHS, 2)),
-    timeseriesTimeout: 60_000,
-    landPriceHistoryConcurrency: getEnvNumber(process.env.MLIT_LAND_PRICE_HISTORY_CONCURRENCY, 3),
+    timeseriesTimeout: getEnvNumber(process.env.JAXA_TIMESERIES_TIMEOUT_MS, 120_000),
+    landPriceHistoryConcurrency: getEnvNumber(process.env.MLIT_LAND_PRICE_HISTORY_CONCURRENCY, 2),
   },
   geocode: {
     baseUrl: "https://msearch.gsi.go.jp/address-search/AddressSearch",
@@ -51,6 +69,13 @@ export const CONFIG = {
     landPriceHistoryYears: 10,
     // Keep in sync with the bundled geospatial MCP server's supported latest survey year.
     landPriceLatestYear: 2025,
+  },
+  city2graph: {
+    timeout: getEnvNumber(process.env.CITY2GRAPH_TIMEOUT_MS, 120_000),
+    enabled: process.env.CITY2GRAPH_ENABLED !== "false",
+    proximityRadiusM: 1000,
+    morphologyRadiusM: 500,
+    isochroneThresholds: [300, 600, 900] as const,
   },
   perspectives,
   perspectiveApiMap: {

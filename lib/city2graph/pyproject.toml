@@ -1,0 +1,13 @@
+[project]
+name = "terrascore-city2graph"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = ["city2graph>=0.2,<1.0", "osmnx>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+markers = ["integration: marks tests that call external APIs (Overture/OSM)"]

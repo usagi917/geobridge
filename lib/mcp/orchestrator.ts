@@ -1,10 +1,13 @@
 import * as jaxa from "./jaxa-client";
 import * as geospatial from "./geospatial-client";
 import * as dpf from "./dpf-client";
+import * as city2graph from "../city2graph/client";
 import { withTimeout } from "./utils";
 import { CONFIG, type Perspective } from "../config";
-import type { GeospatialCallResult, OrchestratorResult } from "./types";
+import type { GeospatialCallResult, LandPriceHistoryPoint, OrchestratorResult } from "./types";
+import type { City2GraphResults } from "../city2graph/types";
 import { CitationTracker } from "../report/citations";
+import { allSettledWithConcurrency } from "../utils/concurrency";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,41 +35,6 @@ async function withRetry<T>(
   }
 }
 
-async function allSettledWithConcurrency<T>(
-  tasks: Array<() => Promise<T>>,
-  concurrency: number
-): Promise<Array<PromiseSettledResult<T>>> {
-  if (tasks.length === 0) return [];
-
-  const results: Array<PromiseSettledResult<T>> = new Array(tasks.length);
-  let nextIndex = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIndex < tasks.length) {
-      const currentIndex = nextIndex;
-      nextIndex += 1;
-
-      try {
-        results[currentIndex] = {
-          status: "fulfilled",
-          value: await tasks[currentIndex](),
-        };
-      } catch (error) {
-        results[currentIndex] = {
-          status: "rejected",
-          reason: error,
-        };
-      }
-    }
-  }
-
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker())
-  );
-
-  return results;
-}
-
 export type ProgressCallback = (step: string) => void;
 
 export interface OrchestrationInput {
@@ -85,6 +53,8 @@ export interface OrchestrationOutput {
 export async function orchestrate(input: OrchestrationInput): Promise<OrchestrationOutput> {
   const { latitude, longitude, radiusM, perspective, onProgress } = input;
   const timeout = CONFIG.mcp.toolTimeout;
+  const geospatialMultiApiTimeout = CONFIG.mcp.geospatialMultiApiTimeout;
+  const geospatialLandPriceTimeout = CONFIG.mcp.geospatialLandPriceTimeout;
   const jaxaStatsTimeout = CONFIG.mcp.jaxaStatsTimeout;
   const jaxaImageTimeout = CONFIG.mcp.jaxaImageTimeout;
   const jaxaConcurrency = CONFIG.mcp.jaxaConcurrency;
@@ -93,6 +63,8 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const errors: OrchestratorResult["errors"] = [];
 
   const targetApis = CONFIG.perspectiveApiMap[perspective];
+  const landPriceDistance = Math.min(radiusM, 425);
+  const multiApiTargets = targetApis.filter((apiCode) => apiCode !== 3);
 
   // Wrap each call to emit progress on completion
   function tracked<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -113,64 +85,104 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   function createJaxaTask<T>(
     promiseFactory: () => Promise<T>,
-    timeoutMs: number,
-    timeoutLabel: string,
+    label: string,
     progressLabel: string
   ): () => Promise<T> {
     return () =>
       tracked(
         withRetry(
-          () => withTimeout(promiseFactory(), timeoutMs, timeoutLabel),
+          promiseFactory,
           jaxaRetryCount,
-          timeoutLabel,
+          label,
           shouldRetryJaxa
         ),
         progressLabel
       );
   }
 
+  // city2graph tasks (run in parallel with everything else)
+  const c2gTimeout = CONFIG.city2graph.timeout;
+  const c2gEnabled = CONFIG.city2graph.enabled;
+  const c2gSkipped: PromiseSettledResult<null> = { status: "fulfilled", value: null };
+  const city2graphPromise = c2gEnabled
+    ? Promise.allSettled([
+        tracked(
+          withTimeout(city2graph.analyzeProximity(latitude, longitude, CONFIG.city2graph.proximityRadiusM), c2gTimeout, "city2graph proximity"),
+          "生活利便ネットワーク"
+        ),
+        tracked(
+          withTimeout(city2graph.analyzeMorphology(latitude, longitude, CONFIG.city2graph.morphologyRadiusM), c2gTimeout, "city2graph morphology"),
+          "街区構造分析"
+        ),
+        tracked(
+          withTimeout(city2graph.analyzeIsochrone(latitude, longitude), c2gTimeout, "city2graph isochrone"),
+          "徒歩圏マップ"
+        ),
+      ])
+    : Promise.resolve([c2gSkipped, c2gSkipped, c2gSkipped] as const);
+
   const nonJaxaResultsPromise = Promise.allSettled([
     tracked(
-      withTimeout(
-        geospatial.getMultiApi(latitude, longitude, targetApis, Math.min(radiusM, 425)),
-        timeout,
-        "MLIT multi_api"
-      ),
+      multiApiTargets.length > 0
+        ? geospatial.getMultiApi(
+            latitude,
+            longitude,
+            multiApiTargets,
+            landPriceDistance,
+            { timeout: geospatialMultiApiTimeout }
+          )
+        : Promise.resolve({ data: null, errors: [] }),
       "MLIT 行政データ"
     ),
     tracked(withTimeout(dpf.searchByLocation(latitude, longitude), timeout, "DPF search"), "MLIT DPF"),
-    tracked(
-      withTimeout(
-        geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear),
-        timeseriesTimeout,
-        "MLIT land price history"
-      ),
-      "地価推移"
-    ),
+    ...(targetApis.includes(3)
+      ? [
+          tracked(
+            geospatial.getLandPricePoint(
+              latitude,
+              longitude,
+              CONFIG.report.landPriceLatestYear,
+              {
+                distance: landPriceDistance,
+                timeout: geospatialLandPriceTimeout,
+                timeoutLabel: "MLIT land price",
+              }
+            ),
+            "地価"
+          ),
+          tracked(
+            withTimeout(
+              geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear, {
+                distance: landPriceDistance,
+                timeout: geospatialLandPriceTimeout,
+              }),
+              timeseriesTimeout,
+              "MLIT land price history"
+            ),
+            "地価推移"
+          ),
+        ]
+      : []),
   ]);
 
   const jaxaStatsTasks = [
     createJaxaTask(
-      () => jaxa.getElevation(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getElevation(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA elevation",
       "JAXA 標高"
     ),
     createJaxaTask(
-      () => jaxa.getNdvi(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getNdvi(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA NDVI",
       "JAXA NDVI"
     ),
     createJaxaTask(
-      () => jaxa.getLst(latitude, longitude, radiusM),
-      jaxaStatsTimeout,
+      () => jaxa.getLst(latitude, longitude, radiusM, { timeout: jaxaStatsTimeout }),
       "JAXA LST",
       "JAXA 地表面温度"
     ),
     createJaxaTask(
-      () => jaxa.getPrecipitation(latitude, longitude),
-      jaxaStatsTimeout,
+      () => jaxa.getPrecipitation(latitude, longitude, { timeout: jaxaStatsTimeout }),
       "JAXA precipitation",
       "JAXA 降水量"
     ),
@@ -178,20 +190,17 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const jaxaImageTasks = [
     createJaxaTask(
-      () => jaxa.getNdviImage(latitude, longitude, radiusM),
-      jaxaImageTimeout,
+      () => jaxa.getNdviImage(latitude, longitude, radiusM, { timeout: jaxaImageTimeout }),
       "JAXA NDVI image",
       "JAXA NDVI 可視化"
     ),
     createJaxaTask(
-      () => jaxa.getLstImage(latitude, longitude, radiusM),
-      jaxaImageTimeout,
+      () => jaxa.getLstImage(latitude, longitude, radiusM, { timeout: jaxaImageTimeout }),
       "JAXA LST image",
       "JAXA 温度可視化"
     ),
     createJaxaTask(
-      () => jaxa.getPrecipitationImage(latitude, longitude),
-      jaxaImageTimeout,
+      () => jaxa.getPrecipitationImage(latitude, longitude, { timeout: jaxaImageTimeout }),
       "JAXA precipitation image",
       "JAXA 降水可視化"
     ),
@@ -199,20 +208,17 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const jaxaTimeseriesTasks = [
     createJaxaTask(
-      () => jaxa.getTimeseriesNdvi(latitude, longitude, radiusM, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesNdvi(latitude, longitude, radiusM, tsYears, { timeout: timeseriesTimeout }),
       "JAXA NDVI timeseries",
       "NDVI トレンド"
     ),
     createJaxaTask(
-      () => jaxa.getTimeseriesLst(latitude, longitude, radiusM, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesLst(latitude, longitude, radiusM, tsYears, { timeout: timeseriesTimeout }),
       "JAXA LST timeseries",
       "温度トレンド"
     ),
     createJaxaTask(
-      () => jaxa.getTimeseriesPrecipitation(latitude, longitude, tsYears),
-      timeseriesTimeout,
+      () => jaxa.getTimeseriesPrecipitation(latitude, longitude, tsYears, { timeout: timeseriesTimeout }),
       "JAXA precip timeseries",
       "降水トレンド"
     ),
@@ -229,11 +235,16 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const [ndviImageResult, lstImageResult, precipImageResult] = jaxaImageResults;
   const [ndviTimeseriesResult, lstTimeseriesResult, precipTimeseriesResult] = jaxaTimeseriesResults;
 
-  const [
-    multiApiResult,
-    dpfResult,
-    landPriceHistoryResult,
-  ] = await nonJaxaResultsPromise;
+  const nonJaxaResults = await nonJaxaResultsPromise;
+  const hasLandPrice = targetApis.includes(3);
+  const multiApiResult = nonJaxaResults[0];
+  const dpfResult = nonJaxaResults[1];
+  const landPriceResult = hasLandPrice
+    ? nonJaxaResults[2] as PromiseSettledResult<GeospatialCallResult<Record<string, unknown>>>
+    : undefined;
+  const landPriceHistoryResult = hasLandPrice
+    ? nonJaxaResults[3] as PromiseSettledResult<GeospatialCallResult<LandPriceHistoryPoint[]>>
+    : undefined;
 
   // Process JAXA results
   const jaxaResults = {
@@ -265,19 +276,32 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   if (multiApi && typeof multiApi === "object") {
     const multiApiRecord = multiApi as Record<string, unknown>;
     geospatialResults.multi_api = multiApiRecord;
-    if (multiApiRecord["3"]) geospatialResults.land_price = multiApiRecord["3"];
     if (multiApiRecord["4"]) geospatialResults.urban_planning = multiApiRecord["4"];
     if (multiApiRecord["5"]) geospatialResults.zoning = multiApiRecord["5"];
   }
-  const landPriceHistory = processGeospatialResult(
-    landPriceHistoryResult,
-    "MLIT Geospatial 地価履歴",
-    "land_price_history",
-    citations,
-    errors
-  );
-  if (landPriceHistory) {
-    geospatialResults.land_price_history = landPriceHistory;
+  if (landPriceResult) {
+    const landPrice = processGeospatialResult(
+      landPriceResult,
+      "MLIT Geospatial 地価",
+      "get_land_price_point_by_location",
+      citations,
+      errors
+    );
+    if (landPrice) {
+      geospatialResults.land_price = landPrice;
+    }
+  }
+  if (landPriceHistoryResult) {
+    const landPriceHistory = processGeospatialResult(
+      landPriceHistoryResult,
+      "MLIT Geospatial 地価履歴",
+      "land_price_history",
+      citations,
+      errors
+    );
+    if (landPriceHistory) {
+      geospatialResults.land_price_history = landPriceHistory;
+    }
   }
 
   // Process DPF results
@@ -285,11 +309,20 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const dpfSearch = processResult(dpfResult, "MLIT DPF", "search", citations, errors);
   if (dpfSearch) dpfResults.search_results = dpfSearch;
 
+  // Process city2graph results
+  const [c2gProximityResult, c2gMorphologyResult, c2gIsochroneResult] = await city2graphPromise;
+  const city2graphResults: City2GraphResults = {
+    proximity: processResult(c2gProximityResult, "Overture Maps", "proximity", citations, errors),
+    morphology: processResult(c2gMorphologyResult, "Overture Maps", "morphology", citations, errors),
+    isochrone: processResult(c2gIsochroneResult, "OSM/city2graph", "isochrone", citations, errors),
+  };
+
   return {
     result: {
       jaxa: jaxaResults,
       geospatial: geospatialResults,
       dpf: dpfResults,
+      city2graph: city2graphResults,
       errors,
     },
     citations,
