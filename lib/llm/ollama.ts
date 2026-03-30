@@ -1,6 +1,6 @@
 import { CONFIG } from "../config";
 
-export interface OllamaGenerateRequest {
+interface OllamaGenerateRequest {
   model: string;
   prompt: string;
   system?: string;
@@ -12,7 +12,7 @@ export interface OllamaGenerateRequest {
   };
 }
 
-export interface OllamaGenerateResponse {
+interface OllamaGenerateResponse {
   model: string;
   response: string;
   thinking?: string;

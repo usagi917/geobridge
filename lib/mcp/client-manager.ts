@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { McpToolResult } from "./types";
 
-export interface McpClientConfig {
+interface McpClientConfig {
   name: string;
   command: string;
   args: string[];

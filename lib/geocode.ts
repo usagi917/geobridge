@@ -1,6 +1,6 @@
 import { CONFIG } from "./config";
 
-export interface GeocodeResult {
+interface GeocodeResult {
   address: string;
   latitude: number;
   longitude: number;

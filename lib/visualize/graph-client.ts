@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import type { GeneratedGraph } from "../report/schema";
 
-export interface GraphGenerationInput {
+interface GraphGenerationInput {
   latitude: number;
   longitude: number;
   radius_m: number;

@@ -35,9 +35,9 @@ async function withRetry<T>(
   }
 }
 
-export type ProgressCallback = (step: string) => void;
+type ProgressCallback = (step: string) => void;
 
-export interface OrchestrationInput {
+interface OrchestrationInput {
   latitude: number;
   longitude: number;
   radiusM: number;
@@ -45,7 +45,7 @@ export interface OrchestrationInput {
   onProgress?: ProgressCallback;
 }
 
-export interface OrchestrationOutput {
+interface OrchestrationOutput {
   result: OrchestratorResult;
   citations: CitationTracker;
 }

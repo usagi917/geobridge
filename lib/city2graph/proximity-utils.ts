@@ -7,7 +7,7 @@ export function distanceToBarWidth(distanceM: number): number {
   return Math.round(Math.min(distanceM, MAX_DISTANCE_M) / MAX_DISTANCE_M * 100);
 }
 
-export type DistanceTier = "近い" | "普通" | "遠い";
+type DistanceTier = "近い" | "普通" | "遠い";
 
 /** 距離を tier に変換: 〜300m: 近い, 〜800m: 普通, 800m〜: 遠い */
 export function getDistanceTier(distanceM: number): DistanceTier {
