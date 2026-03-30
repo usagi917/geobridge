@@ -61,7 +61,7 @@ function recoverPendingJobs(state: QueueState): void {
   }
 }
 
-export function isAnalysisJobActive(jobId: string): boolean {
+function isAnalysisJobActive(jobId: string): boolean {
   return getQueueState().activeJobs.has(jobId);
 }
 

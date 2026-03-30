@@ -8,7 +8,7 @@ export type CategoryKey =
   | "park"
   | "restaurant";
 
-export interface CategoryMaster {
+interface CategoryMaster {
   key: CategoryKey;
   label: string;
   icon: string;
@@ -23,11 +23,6 @@ export const CATEGORIES: CategoryMaster[] = [
   { key: "park", label: "公園", icon: "🌳", colorKey: "bg-green-100 text-green-700" },
   { key: "restaurant", label: "飲食店", icon: "🍽️", colorKey: "bg-orange-100 text-orange-700" },
 ];
-
-/** カテゴリキーからマスタデータを引く */
-export function getCategoryMaster(key: string): CategoryMaster | undefined {
-  return CATEGORIES.find((c) => c.key === key);
-}
 
 /** Record<key, { label, icon, colorKey }> 形式で導出（既存コンポーネント互換） */
 export const CATEGORY_LABELS: Record<string, { label: string; icon: string; color: string }> =

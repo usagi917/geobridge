@@ -1,8 +1,6 @@
 import L from "leaflet";
 import { CATEGORY_COLORS } from "../../lib/city2graph/colors";
 
-export { CATEGORY_COLORS };
-
 // Fix default marker icon issue with webpack/next.js
 export const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",

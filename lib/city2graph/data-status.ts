@@ -2,7 +2,7 @@
 
 import type { ProximityCategory, ProximityResult, MorphologyResult, IsochroneResult, City2GraphResults } from "./types";
 
-export type DataStatus = "available" | "empty" | "unavailable";
+type DataStatus = "available" | "empty" | "unavailable";
 
 /** ProximityCategory の状態を判定する */
 export function getCategoryStatus(

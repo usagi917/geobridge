@@ -1,6 +1,6 @@
 // Morphology 基準値レンジと正規化関数
 
-export interface MetricRange {
+interface MetricRange {
   min: number;
   max: number;
 }
