@@ -92,6 +92,12 @@ describe("constants.ts", () => {
     assert.ok(MORPHOLOGY_RANGES.building_street_facing_ratio);
   });
 
+  test("MORPHOLOGY_RANGES aligns with backend morphology score caps", () => {
+    assert.deepEqual(MORPHOLOGY_RANGES.building_density_per_km2, { min: 0, max: 2000 });
+    assert.deepEqual(MORPHOLOGY_RANGES.street_connectivity, { min: 0, max: 6.0 });
+    assert.deepEqual(MORPHOLOGY_RANGES.building_street_facing_ratio, { min: 0, max: 1.0 });
+  });
+
   test("each range has min and max", () => {
     for (const range of Object.values(MORPHOLOGY_RANGES)) {
       assert.equal(typeof range.min, "number");

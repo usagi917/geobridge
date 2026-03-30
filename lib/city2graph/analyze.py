@@ -183,6 +183,55 @@ def compute_maturity_score(density: float, connectivity: float, facing: float) -
     return min(100, round(density_score + connectivity_score + facing_score))
 
 
+def _extract_street_connectivity(nodes_dict: dict, edges_dict: dict) -> float:
+    """Extract public-street average degree from city2graph morphology output.
+
+    city2graph 0.3.x returns grouped GeoDataFrames keyed by node/edge type.
+    Keep a legacy fallback for older dict-per-edge outputs.
+    """
+    public_nodes = nodes_dict.get("public")
+    public_edges = edges_dict.get(("public", "connected_to", "public"))
+
+    if public_nodes is not None and public_edges is not None and len(public_nodes) > 0:
+        return len(public_edges) * 2 / len(public_nodes)
+
+    legacy_public_nodes = [
+        node for node in nodes_dict.values()
+        if isinstance(node, dict) and node.get("type") == "public"
+    ]
+    legacy_public_edges = [
+        edge for edge in edges_dict.values()
+        if isinstance(edge, dict) and edge.get("type") == "connected_to"
+    ]
+    if legacy_public_nodes:
+        return len(legacy_public_edges) * 2 / len(legacy_public_nodes)
+
+    return 0.0
+
+
+def _extract_building_street_facing_ratio(nodes_dict: dict, edges_dict: dict) -> float:
+    """Extract the share of private spaces that face at least one public street."""
+    private_nodes = nodes_dict.get("private")
+    faced_edges = edges_dict.get(("private", "faced_to", "public"))
+
+    if private_nodes is not None and faced_edges is not None and len(private_nodes) > 0:
+        faced_private_count = faced_edges.index.get_level_values(0).nunique()
+        return min(1.0, faced_private_count / len(private_nodes))
+
+    legacy_private_nodes = [
+        node for node in nodes_dict.values()
+        if isinstance(node, dict) and node.get("type") == "private"
+    ]
+    legacy_faced_edges = [
+        edge for edge in edges_dict.values()
+        if isinstance(edge, dict) and edge.get("type") == "faced_to"
+    ]
+    if legacy_private_nodes:
+        return min(1.0, len(legacy_faced_edges) / len(legacy_private_nodes))
+
+    return 0.0
+
+
 def analyze_morphology(data: dict) -> dict:
     """Analyse urban block structure using Overture Maps Buildings + Segments."""
     from city2graph import load_overture_data, process_overture_segments, morphological_graph
@@ -255,18 +304,8 @@ def analyze_morphology(data: dict) -> dict:
     building_count = len(buildings_gdf)
     density = building_count / area_km2 if area_km2 > 0 else 0
 
-    # Street connectivity: average degree of public nodes
-    public_nodes = [n for n, d in nodes_dict.items() if d.get("type") == "public"]
-    public_edges = [e for e in edges_dict.values() if e.get("type") != "barrier"]
-    if public_nodes:
-        connectivity = len(public_edges) * 2 / len(public_nodes)
-    else:
-        connectivity = 0
-
-    # Building-street facing ratio
-    faced_edges = [e for e in edges_dict.values() if e.get("type") == "faced_to"]
-    facing_ratio = len(faced_edges) / building_count if building_count > 0 else 0
-    facing_ratio = min(facing_ratio, 1.0)
+    connectivity = _extract_street_connectivity(nodes_dict, edges_dict)
+    facing_ratio = _extract_building_street_facing_ratio(nodes_dict, edges_dict)
 
     maturity = compute_maturity_score(density, connectivity, facing_ratio)
 

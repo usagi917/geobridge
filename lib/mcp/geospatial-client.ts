@@ -10,7 +10,6 @@ import {
   type LandPriceHistoryPoint,
   type McpToolResult,
 } from "./types";
-import { withTimeout } from "./utils";
 
 interface GeospatialEnvelope {
   status?: unknown;
@@ -40,8 +39,32 @@ const manager = new McpClientManager({
   },
 });
 
-function callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
-  return manager.callTool(name, args);
+function callTool(name: string, args: Record<string, unknown>, timeout?: number): Promise<McpToolResult> {
+  return manager.callTool(name, args, timeout ? { timeout } : undefined);
+}
+
+function normalizeToolError(
+  error: unknown,
+  timeoutLabel?: string,
+  timeoutMs?: number
+): Error {
+  if (error instanceof Error) {
+    if (
+      timeoutLabel &&
+      timeoutMs &&
+      /timed out|timeout/i.test(error.message) &&
+      !error.message.startsWith("Timeout:")
+    ) {
+      return new Error(`Timeout: ${timeoutLabel} (${timeoutMs}ms)`);
+    }
+    return error;
+  }
+
+  const message = String(error);
+  if (timeoutLabel && timeoutMs && /timed out|timeout/i.test(message)) {
+    return new Error(`Timeout: ${timeoutLabel} (${timeoutMs}ms)`);
+  }
+  return new Error(message);
 }
 
 function getTextContent(result: McpToolResult): string {
@@ -113,7 +136,8 @@ export async function getMultiApi(
   lat: number,
   lon: number,
   targetApis: number[],
-  distance?: number
+  distance?: number,
+  options?: { timeout?: number }
 ): Promise<GeospatialCallResult<Record<string, unknown>>> {
   const args: Record<string, unknown> = {
     lat,
@@ -125,7 +149,13 @@ export async function getMultiApi(
     args.distance = distance;
   }
 
-  const payload = parseEnvelope(await callTool("get_multi_api", args));
+  let payload: GeospatialPayload;
+  try {
+    payload = parseEnvelope(await callTool("get_multi_api", args, options?.timeout));
+  } catch (error) {
+    throw normalizeToolError(error, "MLIT multi_api", options?.timeout);
+  }
+
   const apiResults = extractApiResults(payload);
   const mappedResults: Record<string, unknown> = {};
   const errors: GeospatialToolError[] = [];
@@ -148,11 +178,49 @@ export async function getMultiApi(
   };
 }
 
+export async function getLandPricePoint(
+  lat: number,
+  lon: number,
+  year: number = CONFIG.report.landPriceLatestYear,
+  options?: { distance?: number; timeout?: number; timeoutLabel?: string }
+): Promise<GeospatialCallResult<Record<string, unknown>>> {
+  const args: Record<string, unknown> = {
+    lat,
+    lon,
+    year,
+    save_file: false,
+  };
+  if (options?.distance !== undefined) {
+    args.distance = options.distance;
+  }
+
+  let payload: GeospatialPayload;
+  try {
+    payload = parseEnvelope(
+      await callTool("get_land_price_point_by_location", args, options?.timeout)
+    );
+  } catch (error) {
+    throw normalizeToolError(error, options?.timeoutLabel, options?.timeout);
+  }
+
+  const apiResults = extractApiResults(payload);
+  const geojson = extractGeojson(apiResults[0]);
+  const errorMessage = extractApiErrorMessage(apiResults[0]);
+
+  return {
+    data: geojson,
+    errors: errorMessage
+      ? [toToolError("get_land_price_point_by_location", errorMessage)]
+      : [],
+  };
+}
+
 export async function getLandPriceHistory(
   lat: number,
   lon: number,
   startYear: number = CONFIG.report.landPriceLatestYear - CONFIG.report.landPriceHistoryYears,
-  endYear: number = CONFIG.report.landPriceLatestYear
+  endYear: number = CONFIG.report.landPriceLatestYear,
+  options?: { distance?: number; timeout?: number }
 ): Promise<GeospatialCallResult<LandPriceHistoryPoint[]>> {
   const effectiveEndYear = Math.min(endYear, CONFIG.report.landPriceLatestYear);
   const effectiveStartYear = Math.max(1995, Math.min(startYear, effectiveEndYear));
@@ -160,34 +228,31 @@ export async function getLandPriceHistory(
     { length: effectiveEndYear - effectiveStartYear + 1 },
     (_, index) => effectiveStartYear + index
   );
-  const perRequestTimeout = CONFIG.mcp.toolTimeout;
+  const perRequestTimeout = options?.timeout ?? CONFIG.mcp.geospatialLandPriceTimeout;
   const concurrency = CONFIG.mcp.landPriceHistoryConcurrency;
 
   const yearResults = await mapWithConcurrency(years, concurrency, async (year) => {
     const errors: GeospatialToolError[] = [];
 
     try {
-      const args: Record<string, unknown> = {
+      const pointResult = await getLandPricePoint(
         lat,
         lon,
-        target_apis: [3],
-        save_file: false,
         year,
-      };
-      const payload = parseEnvelope(
-        await withTimeout(
-          callTool("get_multi_api", args),
-          perRequestTimeout,
-          `MLIT land price history ${year}`
+        {
+          distance: options?.distance,
+          timeout: perRequestTimeout,
+          timeoutLabel: `MLIT land price history ${year}`,
+        }
+      );
+
+      errors.push(
+        ...pointResult.errors.map((error) =>
+          toToolError(`land_price_history:${year}`, error.message)
         )
       );
-      const apiResults = extractApiResults(payload);
-      const geojson = extractGeojson(apiResults[0]);
-      const errorMessage = extractApiErrorMessage(apiResults[0]);
-      if (errorMessage) {
-        errors.push(toToolError(`land_price_history:${year}`, errorMessage));
-      }
-      return { year, data: geojson, errors };
+
+      return { year, data: pointResult.data, errors };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return {

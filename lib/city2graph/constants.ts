@@ -6,8 +6,8 @@ export interface MetricRange {
 }
 
 export const MORPHOLOGY_RANGES: Record<string, MetricRange> = {
-  building_density_per_km2: { min: 0, max: 20000 },
-  street_connectivity: { min: 1.0, max: 5.0 },
+  building_density_per_km2: { min: 0, max: 2000 },
+  street_connectivity: { min: 0, max: 6.0 },
   building_street_facing_ratio: { min: 0, max: 1.0 },
 };
 

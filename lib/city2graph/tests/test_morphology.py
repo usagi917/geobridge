@@ -4,11 +4,17 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from analyze import compute_maturity_score
+from analyze import (
+    _extract_building_street_facing_ratio,
+    _extract_street_connectivity,
+    analyze_morphology,
+    compute_maturity_score,
+)
 
 from helpers import run_analyze, TOKYO_STATION, OCEAN_POINT
 
@@ -63,6 +69,40 @@ def test_maturity_facing_weight():
     assert high > low
 
 
+def test_extract_street_connectivity_from_grouped_city2graph_output():
+    nodes = {
+        "private": pd.DataFrame(index=["a", "b", "c"]),
+        "public": pd.DataFrame(index=[1, 2, 3, 4]),
+    }
+    edges = {
+        ("public", "connected_to", "public"): pd.DataFrame(
+            index=pd.MultiIndex.from_tuples(
+                [(1, 2), (2, 3), (3, 4)],
+                names=["from_public_id", "to_public_id"],
+            )
+        ),
+    }
+
+    assert _extract_street_connectivity(nodes, edges) == 1.5
+
+
+def test_extract_building_street_facing_ratio_from_grouped_city2graph_output():
+    nodes = {
+        "private": pd.DataFrame(index=["a", "b", "c"]),
+        "public": pd.DataFrame(index=[1, 2]),
+    }
+    edges = {
+        ("private", "faced_to", "public"): pd.DataFrame(
+            index=pd.MultiIndex.from_tuples(
+                [("a", 1), ("a", 2), ("c", 2)],
+                names=["private_id", "public_id"],
+            )
+        ),
+    }
+
+    assert _extract_building_street_facing_ratio(nodes, edges) == pytest.approx(2 / 3)
+
+
 # ── analyze_morphology integration tests ──
 
 
@@ -104,14 +144,35 @@ def test_morphology_score_range():
 
 
 @pytest.mark.integration
-def test_morphology_ocean_graceful():
-    """Ocean coordinates → maturity_score=0, no crash."""
+def test_morphology_tokyo_network_metrics_are_nonzero():
     payload = {
         "type": "morphology",
-        "latitude": OCEAN_POINT["latitude"],
-        "longitude": OCEAN_POINT["longitude"],
+        "latitude": TOKYO_STATION["latitude"],
+        "longitude": TOKYO_STATION["longitude"],
         "radius_m": 500,
     }
     result = run_analyze(json.dumps(payload))
+    assert result["metrics"]["street_connectivity"] > 0
+    assert result["metrics"]["building_street_facing_ratio"] > 0
+
+
+def test_morphology_ocean_graceful(monkeypatch):
+    """No building data → maturity_score=0, no crash."""
+    import city2graph
+
+    monkeypatch.setattr(
+        city2graph,
+        "load_overture_data",
+        lambda **_: {
+            "building": pd.DataFrame(),
+            "segment": pd.DataFrame(),
+        },
+    )
+
+    result = analyze_morphology({
+        "latitude": OCEAN_POINT["latitude"],
+        "longitude": OCEAN_POINT["longitude"],
+        "radius_m": 500,
+    })
     assert "maturity_score" in result
     assert result["maturity_score"] == 0

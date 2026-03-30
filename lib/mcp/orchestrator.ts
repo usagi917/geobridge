@@ -53,6 +53,8 @@ export interface OrchestrationOutput {
 export async function orchestrate(input: OrchestrationInput): Promise<OrchestrationOutput> {
   const { latitude, longitude, radiusM, perspective, onProgress } = input;
   const timeout = CONFIG.mcp.toolTimeout;
+  const geospatialMultiApiTimeout = CONFIG.mcp.geospatialMultiApiTimeout;
+  const geospatialLandPriceTimeout = CONFIG.mcp.geospatialLandPriceTimeout;
   const jaxaStatsTimeout = CONFIG.mcp.jaxaStatsTimeout;
   const jaxaImageTimeout = CONFIG.mcp.jaxaImageTimeout;
   const jaxaConcurrency = CONFIG.mcp.jaxaConcurrency;
@@ -61,6 +63,8 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const errors: OrchestratorResult["errors"] = [];
 
   const targetApis = CONFIG.perspectiveApiMap[perspective];
+  const landPriceDistance = Math.min(radiusM, 425);
+  const multiApiTargets = targetApis.filter((apiCode) => apiCode !== 3);
 
   // Wrap each call to emit progress on completion
   function tracked<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -119,17 +123,39 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
 
   const nonJaxaResultsPromise = Promise.allSettled([
     tracked(
-      withTimeout(
-        geospatial.getMultiApi(latitude, longitude, targetApis, Math.min(radiusM, 425)),
-        timeout,
-        "MLIT multi_api"
-      ),
+      multiApiTargets.length > 0
+        ? geospatial.getMultiApi(
+            latitude,
+            longitude,
+            multiApiTargets,
+            landPriceDistance,
+            { timeout: geospatialMultiApiTimeout }
+          )
+        : Promise.resolve({ data: null, errors: [] }),
       "MLIT 行政データ"
     ),
     tracked(withTimeout(dpf.searchByLocation(latitude, longitude), timeout, "DPF search"), "MLIT DPF"),
     tracked(
+      targetApis.includes(3)
+        ? geospatial.getLandPricePoint(
+            latitude,
+            longitude,
+            CONFIG.report.landPriceLatestYear,
+            {
+              distance: landPriceDistance,
+              timeout: geospatialLandPriceTimeout,
+              timeoutLabel: "MLIT land price",
+            }
+          )
+        : Promise.resolve({ data: null, errors: [] }),
+      "地価"
+    ),
+    tracked(
       withTimeout(
-        geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear),
+        geospatial.getLandPriceHistory(latitude, longitude, lpStartYear, lpEndYear, {
+          distance: landPriceDistance,
+          timeout: geospatialLandPriceTimeout,
+        }),
         timeseriesTimeout,
         "MLIT land price history"
       ),
@@ -210,6 +236,7 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   const [
     multiApiResult,
     dpfResult,
+    landPriceResult,
     landPriceHistoryResult,
   ] = await nonJaxaResultsPromise;
 
@@ -243,9 +270,18 @@ export async function orchestrate(input: OrchestrationInput): Promise<Orchestrat
   if (multiApi && typeof multiApi === "object") {
     const multiApiRecord = multiApi as Record<string, unknown>;
     geospatialResults.multi_api = multiApiRecord;
-    if (multiApiRecord["3"]) geospatialResults.land_price = multiApiRecord["3"];
     if (multiApiRecord["4"]) geospatialResults.urban_planning = multiApiRecord["4"];
     if (multiApiRecord["5"]) geospatialResults.zoning = multiApiRecord["5"];
+  }
+  const landPrice = processGeospatialResult(
+    landPriceResult,
+    "MLIT Geospatial 地価",
+    "get_land_price_point_by_location",
+    citations,
+    errors
+  );
+  if (landPrice) {
+    geospatialResults.land_price = landPrice;
   }
   const landPriceHistory = processGeospatialResult(
     landPriceHistoryResult,
