@@ -322,7 +322,11 @@ async function calcSpatialStatsTimeseries(
   let detectedUnit: string | undefined;
 
   for (const r of results) {
-    if (r.status !== "fulfilled") continue;
+    if (r.status !== "fulfilled") {
+      console.warn(`[jaxa] timeseries chunk failed for ${collectionId}/${band}:`,
+        r.reason instanceof Error ? r.reason.message : r.reason);
+      continue;
+    }
     const { raw, year } = r.value;
     if (!detectedUnit && raw.unit) detectedUnit = raw.unit;
     allPoints.push(...buildMonthlyTimeseriesPoints(raw, year));

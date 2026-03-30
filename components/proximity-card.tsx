@@ -1,7 +1,7 @@
 "use client";
 
 import type { ProximityResult } from "../lib/city2graph/types";
-import { CATEGORY_LABELS } from "../lib/city2graph/categories";
+import { CATEGORY_LABELS, type CategoryKey } from "../lib/city2graph/categories";
 import { CATEGORY_COLORS } from "../lib/city2graph/colors";
 import { getCategoryStatus } from "../lib/city2graph/data-status";
 import { distanceToBarWidth, getDistanceTier, getTierStyle } from "../lib/city2graph/proximity-utils";
@@ -34,7 +34,7 @@ export function ProximityCard({ data }: ProximityCardProps) {
           if (!config) return null;
           const status = getCategoryStatus(cat);
           const nearest = cat.facilities[0];
-          const color = CATEGORY_COLORS[key] ?? "#6b7280";
+          const color = CATEGORY_COLORS[key as CategoryKey] ?? "#6b7280";
 
           return (
             <div key={key} className="space-y-1">

@@ -1,3 +1,5 @@
+import type { CategoryKey } from "./categories";
+
 // ── Proximity (生活利便ネットワーク) ──
 
 export interface ProximityFacility {
@@ -5,7 +7,7 @@ export interface ProximityFacility {
   distance_m: number;
   lat: number;
   lon: number;
-  category: string;
+  category: CategoryKey;
 }
 
 export interface ProximityCategory {

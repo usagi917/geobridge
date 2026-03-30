@@ -17,7 +17,7 @@ interface City2GraphPayload {
 async function runCity2Graph<T>(payload: City2GraphPayload): Promise<T | null> {
   if (!CONFIG.city2graph.enabled) return null;
 
-  return new Promise<T | null>((resolve) => {
+  return new Promise<T | null>((resolve, reject) => {
     const child = spawn(
       "uv",
       ["run", "--directory", "./lib/city2graph", "python", "analyze.py"],
@@ -31,11 +31,18 @@ async function runCity2Graph<T>(payload: City2GraphPayload): Promise<T | null> {
       },
     );
 
+    const MAX_STDOUT_BYTES = 10 * 1024 * 1024; // 10 MB
     let stdout = "";
     let stderr = "";
+    let killed = false;
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString();
+      if (Buffer.byteLength(stdout) > MAX_STDOUT_BYTES && !killed) {
+        killed = true;
+        child.kill("SIGTERM");
+        reject(new Error("city2graph output exceeded 10 MB limit"));
+      }
     });
 
     child.stderr.on("data", (chunk: Buffer) => {
@@ -45,13 +52,13 @@ async function runCity2Graph<T>(payload: City2GraphPayload): Promise<T | null> {
     child.on("error", (err) => {
       console.error("[city2graph] spawn error:", err.message);
       if (!child.killed) child.kill();
-      resolve(null);
+      reject(new Error(`city2graph spawn failed: ${err.message}`));
     });
 
     child.on("close", (code) => {
       if (code !== 0) {
         console.error(`[city2graph] exited with code ${code}`, stderr);
-        resolve(null);
+        reject(new Error(`city2graph exited with code ${code}: ${stderr.slice(0, 200)}`));
         return;
       }
 
@@ -59,13 +66,13 @@ async function runCity2Graph<T>(payload: City2GraphPayload): Promise<T | null> {
         const parsed = JSON.parse(stdout) as Record<string, unknown>;
         if ("error" in parsed) {
           console.error(`[city2graph] ${payload.type} error:`, parsed.error);
-          resolve(null);
+          reject(new Error(`city2graph ${payload.type} error: ${parsed.error}`));
           return;
         }
         resolve(parsed as T);
       } catch (e) {
         console.error("[city2graph] failed to parse output:", e);
-        resolve(null);
+        reject(new Error(`city2graph output parse failed: ${e instanceof Error ? e.message : String(e)}`));
       }
     });
 

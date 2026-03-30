@@ -179,8 +179,8 @@ const summarySectionContentSchema = sectionContentSchema.extend({
 
 export const reportInputSchema = z.object({
   address: z.string(),
-  latitude: z.number(),
-  longitude: z.number(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
   radius_m: z.number().int().min(1).max(400).default(400),
   perspective: z.enum(["comprehensive", "child_rearing", "disaster", "livability"]).default("comprehensive"),
 });

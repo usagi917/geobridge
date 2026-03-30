@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import traceback
+from typing import Callable
 
 import math
 
@@ -285,6 +286,7 @@ def analyze_morphology(data: dict) -> dict:
     try:
         nodes_dict, edges_dict = morphological_graph(buildings_proj, processed_segments)
     except Exception:
+        traceback.print_exc(file=sys.stderr)
         # Fallback: just report building metrics
         area_km2 = (radius_m * 2 / 1000) ** 2 * math.pi / 4
         building_count = len(buildings_gdf)
@@ -297,6 +299,7 @@ def analyze_morphology(data: dict) -> dict:
                 "building_street_facing_ratio": 0,
             },
             "maturity_score": compute_maturity_score(density, 0, 0),
+            "graph_analysis_failed": True,
         }
 
     # Calculate metrics
@@ -336,7 +339,8 @@ def analyze_isochrone(data: dict) -> dict:
 
     try:
         G = ox.graph_from_point((lat, lon), dist=max_dist, network_type="walk")
-    except Exception:
+    except Exception as e:
+        print(f"[isochrone] graph_from_point failed: {e}", file=sys.stderr)
         return {"type": "FeatureCollection", "features": []}
 
     # Add travel_time edge attribute
@@ -364,7 +368,7 @@ def analyze_isochrone(data: dict) -> dict:
                 geom = iso_result.geometry.iloc[0]
                 if geom.is_empty:
                     continue
-                # Convert back to EPSG:4326 if needed, then to GeoJSON
+                # Assumes isochrone result is in EPSG:4326 (same CRS as osmnx input)
                 geom_dict = mapping(geom)
                 geom_dict = round_coords(geom_dict, 6)
                 features.append({
@@ -375,13 +379,14 @@ def analyze_isochrone(data: dict) -> dict:
                     },
                     "geometry": geom_dict,
                 })
-        except Exception:
+        except Exception as e:
+            print(f"[isochrone] create_isochrone failed for {threshold}s: {e}", file=sys.stderr)
             continue
 
     return {"type": "FeatureCollection", "features": features}
 
 
-HANDLERS: dict[str, callable] = {
+HANDLERS: dict[str, "Callable[[dict], dict]"] = {
     "proximity": analyze_proximity,
     "morphology": analyze_morphology,
     "isochrone": analyze_isochrone,

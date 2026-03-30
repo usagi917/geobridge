@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const result = await geocodeAddress(trimmed);
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "ジオコーディングに失敗しました";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[api/geocode] Error:", error);
+    return NextResponse.json({ error: "ジオコーディングに失敗しました" }, { status: 500 });
   }
 }

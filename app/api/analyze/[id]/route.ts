@@ -8,24 +8,33 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  try {
+    const { id } = await params;
 
-  if (!UUID_RE.test(id)) {
+    if (!UUID_RE.test(id)) {
+      return NextResponse.json(
+        { error: "無効なジョブIDです" },
+        { status: 400 }
+      );
+    }
+
+    const job = getAnalysisJob(id);
+    if (!job) {
+      return NextResponse.json(
+        { error: "分析ジョブが見つかりません" },
+        { status: 404 }
+      );
+    }
+
+    ensureAnalysisJobScheduled(id);
+
+    const updatedJob = getAnalysisJob(id) ?? job;
+    return NextResponse.json(updatedJob);
+  } catch (error) {
+    console.error("[api/analyze] Error:", error);
     return NextResponse.json(
-      { error: "無効なジョブIDです" },
-      { status: 400 }
+      { error: "分析ジョブの取得中にエラーが発生しました" },
+      { status: 500 }
     );
   }
-
-  ensureAnalysisJobScheduled(id);
-
-  const job = getAnalysisJob(id);
-  if (!job) {
-    return NextResponse.json(
-      { error: "分析ジョブが見つかりません" },
-      { status: 404 }
-    );
-  }
-
-  return NextResponse.json(job);
 }

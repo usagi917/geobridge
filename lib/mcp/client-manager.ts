@@ -40,6 +40,11 @@ export class McpClientManager {
         { capabilities: {} }
       );
       await client.connect(transport);
+      transport.onerror = () => {
+        this.client = null;
+        this.transport = null;
+        this.clientPromise = null;
+      };
       this.transport = transport;
       this.client = client;
       return client;
@@ -79,8 +84,8 @@ export class McpClientManager {
     if (this.transport) {
       try {
         await this.transport.close();
-      } catch {
-        // Ignore close errors during shutdown
+      } catch (error) {
+        console.warn(`[mcp:${this.config.name}] close error (non-fatal):`, error instanceof Error ? error.message : error);
       }
       this.client = null;
       this.transport = null;
@@ -97,7 +102,7 @@ function registerShutdownHandlers(): void {
     await Promise.allSettled(managers.map((m) => m.close()));
   }
 
-  process.on("SIGINT", () => { shutdownAll().finally(() => process.exit(0)); });
-  process.on("SIGTERM", () => { shutdownAll().finally(() => process.exit(0)); });
-  process.on("beforeExit", () => { shutdownAll(); });
+  process.on("SIGINT", () => { void shutdownAll(); });
+  process.on("SIGTERM", () => { void shutdownAll(); });
+  process.on("beforeExit", () => { void shutdownAll(); });
 }

@@ -23,19 +23,20 @@ export async function searchByLocation(
   lon: number,
   radiusKm: number = 1
 ): Promise<unknown> {
-  try {
-    const result = await callTool("search_by_location_point_distance", {
-      location_lat: lat,
-      location_lon: lon,
-      location_distance: radiusKm * 1000,
-    });
-    if (result.isError) return null;
+  const result = await callTool("search_by_location_point_distance", {
+    location_lat: lat,
+    location_lon: lon,
+    location_distance: radiusKm * 1000,
+  });
+  if (result.isError) {
     const text = getTextFromToolResult(result);
-    if (!text) return null;
-    return JSON.parse(text);
-  } catch {
-    return null;
+    throw new Error(`DPF search returned error: ${text ?? "unknown"}`);
   }
+  const text = getTextFromToolResult(result);
+  if (!text) {
+    throw new Error("DPF search returned no text payload");
+  }
+  return JSON.parse(text);
 }
 
 export async function closeClient(): Promise<void> {

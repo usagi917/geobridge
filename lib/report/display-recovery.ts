@@ -11,33 +11,38 @@ import {
 export function recoverSectionsForDisplay(
   report: Report
 ): Report["sections"] {
-  const sections = report.sections;
-  const rawDump = sections.summary.facts.find(looksLikeStructuredDump);
-  if (!rawDump) return sections;
+  try {
+    const sections = report.sections;
+    const rawDump = sections.summary.facts.find(looksLikeStructuredDump);
+    if (!rawDump) return sections;
 
-  const recovered = parseStructuredReportOutput(rawDump).output;
-  if (!recovered) {
+    const recovered = parseStructuredReportOutput(rawDump).output;
+    if (!recovered) {
+      return {
+        ...sections,
+        summary: buildLegacySummaryFallback(sections.summary),
+        data_gaps: {
+          ...sections.data_gaps,
+          gaps: uniqueStrings([
+            "保存済みレポート内の生JSONを省略しました。再生成すると改善します。",
+            ...sections.data_gaps.gaps,
+          ]),
+        },
+      };
+    }
+
     return {
-      ...sections,
-      summary: buildLegacySummaryFallback(sections.summary),
-      data_gaps: {
-        ...sections.data_gaps,
-        gaps: uniqueStrings([
-          "保存済みレポート内の生JSONを省略しました。再生成すると改善します。",
-          ...sections.data_gaps.gaps,
-        ]),
-      },
+      summary: pickDisplaySection(stripStructuredDump(sections.summary), recovered.summary),
+      disaster_safety: pickDisplaySection(sections.disaster_safety, recovered.disaster_safety),
+      livability: pickDisplaySection(sections.livability, recovered.livability),
+      environment: pickDisplaySection(sections.environment, recovered.environment),
+      regional_context: pickDisplaySection(sections.regional_context, recovered.regional_context),
+      data_gaps: mergeDisplayDataGaps(sections.data_gaps, recovered),
     };
+  } catch (error) {
+    console.error("[display-recovery] Failed to recover sections:", error);
+    return report.sections;
   }
-
-  return {
-    summary: pickDisplaySection(stripStructuredDump(sections.summary), recovered.summary),
-    disaster_safety: pickDisplaySection(sections.disaster_safety, recovered.disaster_safety),
-    livability: pickDisplaySection(sections.livability, recovered.livability),
-    environment: pickDisplaySection(sections.environment, recovered.environment),
-    regional_context: pickDisplaySection(sections.regional_context, recovered.regional_context),
-    data_gaps: mergeDisplayDataGaps(sections.data_gaps, recovered),
-  };
 }
 
 function looksLikeStructuredDump(value: string): boolean {

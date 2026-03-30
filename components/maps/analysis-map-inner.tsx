@@ -6,7 +6,7 @@ import { MapContainer, TileLayer, Marker, Circle, Popup, GeoJSON } from "react-l
 import type { PathOptions } from "leaflet";
 import type { IsochroneResult, ProximityFacility } from "../../lib/city2graph/types";
 import { ISOCHRONE_COLORS, CATEGORY_COLORS } from "../../lib/city2graph/colors";
-import { CATEGORIES } from "../../lib/city2graph/categories";
+import { CATEGORIES, type CategoryKey } from "../../lib/city2graph/categories";
 import { defaultIcon, getCategoryIcon } from "./map-icons";
 
 export interface AnalysisMapInnerProps {
@@ -39,7 +39,7 @@ function MapLegend({
   presentCategories,
 }: {
   hasIsochrone: boolean;
-  presentCategories: string[];
+  presentCategories: CategoryKey[];
 }) {
   const [open, setOpen] = useState(false);
   const hasContent = hasIsochrone || presentCategories.length > 0;

@@ -53,8 +53,11 @@ function recoverPendingJobs(state: QueueState): void {
     if (recovered) {
       void pumpAnalysisQueue();
     }
-  } catch {
-    // DB may not be initialized yet during early import — silently skip.
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes("no such table")) {
+      console.error("[job-runner] Failed to recover pending jobs:", msg);
+    }
   }
 }
 
